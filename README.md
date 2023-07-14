@@ -3,6 +3,8 @@ Realtime Whisper
 
 ASR (Automatic Speech Recognition) for real-time streamed audio powered by [Whisper](https://github.com/openai/whisper) and [transformers](https://github.com/huggingface/transformers).
 
+While this tool is designed to handle real-time streamed audio, it is specifically tuned for use in conversational bots, providing efficient and accurate speech-to-text conversion in interactive contexts. However, its versatile design allows it to be easily adapted for other real-time audio transcription needs.
+
 **Currently implemented only Websocket interface.**
 
 ## Installation
