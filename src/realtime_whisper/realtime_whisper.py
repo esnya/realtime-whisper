@@ -1,7 +1,8 @@
 import asyncio
+from functools import cache
 import logging
 import re
-from typing import AsyncContextManager, AsyncIterator
+from typing import AsyncContextManager, AsyncIterator, Tuple
 
 import numpy as np
 import torch
@@ -12,49 +13,55 @@ from transformers import (
     WhisperTokenizerFast,
 )
 
-from .config import RealtimeWhisperConfig
+
+from .config import RealtimeWhisperConfig, WhisperModelConfig
 
 logger = logging.getLogger(__name__)
 
 
+@cache
+def load_models(
+    config: WhisperModelConfig,
+) -> Tuple[
+    WhisperForConditionalGeneration, WhisperFeatureExtractor, WhisperTokenizerFast
+]:
+    logger.info("Loading model %s", config)
+
+    model = WhisperForConditionalGeneration.from_pretrained(
+        config.model,
+    )
+    assert isinstance(model, WhisperForConditionalGeneration)
+    model = model.to(
+        config.device,
+        config.torch_dtype,
+    )
+    model.config.suppress_tokens = model.config.suppress_tokens and [
+        id for id in model.config.suppress_tokens if id > 50257
+    ]
+    if model.generation_config is not None:
+        model.generation_config.suppress_tokens = model.config.suppress_tokens
+
+    feature_extractor = WhisperFeatureExtractor.from_pretrained(config.model)
+    assert isinstance(feature_extractor, WhisperFeatureExtractor)
+
+    tokenizer = WhisperTokenizerFast.from_pretrained(config.model)
+    assert isinstance(tokenizer, WhisperTokenizerFast)
+
+    return model, feature_extractor, tokenizer
+
+
 class RealtimeWhisper(AsyncContextManager):
-    def __init__(self, config: RealtimeWhisperConfig):
+    def __init__(self, config: RealtimeWhisperConfig = RealtimeWhisperConfig()):  # type: ignore
+        if config.vram_fraction:
+            torch.cuda.set_per_process_memory_fraction(config.vram_fraction)
+
         self.config = config
         self.forced_message = None
         self.stop_flag = asyncio.Event()
-        self.no_speech_pattern = re.compile(self.config.no_speech_pattern)
+        self.no_speech_pattern = re.compile(config.vad.no_speech_pattern)
+        self.model, self.feature_extractor, self.tokenizer = load_models(config.whisper)
 
         self._clear_buffer()
-
-        logger.info(
-            "Loading model %s (device_map: %s, torch_dtype: %s)",
-            self.config.model,
-            self.config.device,
-            self.config.torch_dtype,
-        )
-        model = WhisperForConditionalGeneration.from_pretrained(
-            self.config.model,
-        )
-        assert isinstance(model, WhisperForConditionalGeneration)
-        self.model = model.to(
-            self.config.device,
-            getattr(torch, self.config.torch_dtype),
-        )
-        self.model.config.suppress_tokens = self.model.config.suppress_tokens and [
-            id for id in self.model.config.suppress_tokens if id > 50257
-        ]
-        if self.model.generation_config is not None:
-            self.model.generation_config.suppress_tokens = (
-                self.model.config.suppress_tokens
-            )
-
-        self.feature_extractor = WhisperFeatureExtractor.from_pretrained(
-            self.config.model
-        )
-        assert isinstance(self.feature_extractor, WhisperFeatureExtractor)
-
-        self.tokenizer = WhisperTokenizerFast.from_pretrained(self.config.model)
-        assert isinstance(self.tokenizer, WhisperTokenizerFast)
 
     async def __aenter__(self):
         return self
@@ -64,7 +71,7 @@ class RealtimeWhisper(AsyncContextManager):
 
     def write(self, audio: np.ndarray):
         self.audio_buffer = np.concatenate((self.audio_buffer, audio))[
-            -self.config.max_frames :
+            -self.config.vad.max_frames :
         ]
 
     def stop(self):
@@ -76,24 +83,20 @@ class RealtimeWhisper(AsyncContextManager):
     async def transcribe(self):
         logger.info("Transcribing %s frames", self.audio_buffer.size)
 
-        if self.forced_message is not None:
-            forced_message = self.forced_message
-            self.forced_message = None
-
-            return forced_message
-
-        if self.audio_buffer.size < self.config.min_frames:
+        if self.audio_buffer.size < self.config.vad.min_frames:
             logger.info(
                 "Not enough frames (%s < %s)",
                 self.audio_buffer.size,
-                self.config.min_frames,
+                self.config.vad.min_frames,
             )
-            await asyncio.sleep(self.config.min_duration)
+            await asyncio.sleep(self.config.vad.min_duration)
             return None
 
-        max_new_tokens = int(self.config.max_tokens_per_frame * self.audio_buffer.size)
+        max_new_tokens = int(
+            self.config.vad.max_tokens_per_frame * self.audio_buffer.size
+        )
         max_volume = np.max(self.audio_buffer)
-        end_volume = np.max(self.audio_buffer[-self.config.end_frames :])
+        end_volume = np.max(self.audio_buffer[-self.config.vad.end_frames :])
 
         if max_volume == 0.0:
             logger.info("Zero volume")
@@ -109,17 +112,14 @@ class RealtimeWhisper(AsyncContextManager):
 
         input_features = self.feature_extractor(
             self.audio_buffer,
-            sampling_rate=self.config.sampling_rate,
+            sampling_rate=self.config.vad.sampling_rate,
             return_tensors="pt",
         )["input_features"].to(self.model.device, self.model.dtype)
 
         model_outputs = await asyncio.to_thread(
             self.model.generate,
             input_features,
-            task=self.config.task,
-            language=self.config.language,
-            num_beams=self.config.num_beams,
-            do_sample=self.config.do_sample,
+            **self.config.generation.model_dump(exclude_none=True),
             max_new_tokens=max_new_tokens,
             return_dict_in_generate=True,
             output_scores=True,
@@ -141,11 +141,11 @@ class RealtimeWhisper(AsyncContextManager):
         )
 
         accept = (
-            transcription not in self.config.blacklist
-            and evr > self.config.end_volume_ratio_threshold
-            and last_logprob > self.config.eos_logprob_threshold
+            transcription not in self.config.vad.blacklist
+            and evr > self.config.vad.end_volume_ratio_threshold
+            and last_logprob > self.config.vad.eos_logprob_threshold
             and model_outputs.sequences[0][-1].item() == self.tokenizer.eos_token_id
-            and mean_logprob > self.config.mean_logprob_threshold
+            and mean_logprob > self.config.vad.mean_logprob_threshold
             and self.no_speech_pattern.search(transcription) is None
         )
 

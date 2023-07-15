@@ -1,23 +1,32 @@
+import logging
 from pathlib import Path
 from unittest import IsolatedAsyncioTestCase
 
 import numpy as np
-
 from src.realtime_whisper.config import RealtimeWhisperConfig
 from src.realtime_whisper.realtime_whisper import RealtimeWhisper
 
 
 class TestRealtimeWhisper(IsolatedAsyncioTestCase):
     def setUp(self):
-        self.config = RealtimeWhisperConfig(
-            model="openai/whisper-tiny",
-            language="en",
-            min_duration=0.1,
-            eos_logprob_threshold=-10,
-            mean_logprob_threshold=-10,
-            do_sample=False,
-            num_beams=1,
+        self.config = RealtimeWhisperConfig.model_validate(
+            {
+                "logging": {
+                    "level": "WARNING",
+                },
+                "whisper": {
+                    "model": "openai/whisper-tiny",
+                    "device": "cpu",
+                },
+                "vad": {
+                    "min_duration": 0.1,
+                    "eos_logprob_threshold": -10,
+                    "mean_logprob_threshold": -10,
+                },
+            },
+            strict=True,
         )
+        logging.basicConfig(**self.config.logging.model_dump(exclude_none=True))
 
         self.audio_data = (
             np.fromfile(Path(__file__).parent / "test.pcm", dtype=np.int16).astype(
@@ -40,5 +49,5 @@ class TestRealtimeWhisper(IsolatedAsyncioTestCase):
         assert isinstance(text, str)
         self.assertEqual(
             text.strip().lower(),
-            "Real-time whisper, automatic speed recognition by whisper from open AI in real-time audio stream through web socket.".lower(),
+            "Real-time whisper, automatic speed recognition by whisper from open AI in real-time audio stream through web socket.".lower(),  # noqa
         )

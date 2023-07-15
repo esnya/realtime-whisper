@@ -16,6 +16,9 @@ accelerate = "*"
 numpy = "*"
 torch = {version = "*", index = "downloadpytorch"}
 torchaudio = {version = "*", index = "downloadpytorch"}
+dynaconf = "*"
+pydantic = "*"
+pydantic-settings = "*"
 
 [dev-packages]
 bandit = "*"

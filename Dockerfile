@@ -6,10 +6,10 @@ RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/w
 RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/whisper-small small -s
 RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/whisper-medium medium -s
 RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/whisper-large-v2 large -s
-RUN --mount=type=cache,target=/root/.cache pip install websockets accelerate
+RUN --mount=type=cache,target=/root/.cache pip install websockets accelerate pydantic pydantic_settings
 
 ADD src/ /workspace/
 
 
 EXPOSE 8760
-ENTRYPOINT ["python", "-m", "realtime_whisper", "--log-level", "INFO", "--websocket", "--websocket-host", "0.0.0.0", "--model", "medium-bf16"]
+ENTRYPOINT ["python", "-m", "realtime_whisper", "--level", "INFO", "--host", "0.0.0.0", "--port", "8760", "--model", "medium-bf16"]

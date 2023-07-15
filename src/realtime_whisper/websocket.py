@@ -10,7 +10,9 @@ from .realtime_whisper import RealtimeWhisper
 logger = logging.getLogger(__name__)
 
 
-async def serve_websocket(config: RealtimeWhisperConfig):
+async def serve_websocket(
+    config: RealtimeWhisperConfig = RealtimeWhisperConfig(),  # type: ignore
+):
     async def connection_handler(websocket: WebSocketServerProtocol):
         async with RealtimeWhisper(config) as whisper:
 
@@ -28,10 +30,9 @@ async def serve_websocket(config: RealtimeWhisperConfig):
 
             await asyncio.gather(reader(), writer())
 
+    websocket_config = config.websocket
+    assert websocket_config is not None
     async with serve(
-        connection_handler,
-        config.websocket_host,
-        config.websocket_port,
-        ping_timeout=config.websocket_ping_timeout,
+        connection_handler, **websocket_config.model_dump(exclude_none=True)
     ) as server:
         await server.wait_closed()
