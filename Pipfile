@@ -9,24 +9,24 @@ verify_ssl = true
 name = "downloadpytorch"
 
 [packages]
-transformers = "*"
-safetensors = "*"
-websockets = "*"
 accelerate = "*"
 numpy = "*"
-torch = {version = "*", index = "downloadpytorch"}
-torchaudio = {version = "*", index = "downloadpytorch"}
-dynaconf = "*"
+optimum = "*"
 pydantic = "*"
 pydantic-settings = "*"
+safetensors = "*"
+torch = {version = "*", index = "downloadpytorch"}
+torchaudio = {version = "*", index = "downloadpytorch"}
+transformers = "*"
+websockets = "*"
 
 [dev-packages]
 bandit = "*"
-pyaudio = "*"
 datasets = "*"
 librosa = "*"
-numpy = "*"
 numba = "*"
+numpy = "*"
+pyaudio = "*"
 
 [requires]
 python_version = "3.10"
