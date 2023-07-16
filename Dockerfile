@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/w
 RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/whisper-small small -s
 RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/whisper-medium medium -s
 RUN --mount=type=cache,target=/root/.cache python ./scripts/download.py openai/whisper-large-v2 large -s
-RUN --mount=type=cache,target=/root/.cache pip install websockets accelerate pydantic pydantic_settings
+RUN --mount=type=cache,target=/root/.cache pip install websockets accelerate pydantic pydantic_settings optimum
 
 ADD src/ /workspace/
 

@@ -8,6 +8,7 @@ from typing import Any, Generic, Optional, TypeVar, Union, get_args, get_origin
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
+from .realtime_whisper import load_models
 from .config import RealtimeWhisperConfig
 
 T = TypeVar("T", bound=BaseModel)
@@ -129,6 +130,8 @@ def cli():
     ).parse_args_typed()
 
     logging.basicConfig(**config.logging.model_dump(exclude_none=True))
+
+    load_models(config.whisper)
 
     if config.websocket:
         from .websocket import serve_websocket

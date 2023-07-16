@@ -21,25 +21,32 @@ class WhisperModelConfig(BaseModel):
         "openai/whisper-medium",
         description="Model name to load. Repository name or local path.",
     )
-    device: str = Field(
-        "cuda" if torch.cuda.is_available() else "cpu",
+    device: Optional[str] = Field(
+        None,
         description="Device to load model on.",
         examples=["cpu", "cuda"],
     )
     bp16: bool = Field(False, description="Whether to use bfloat16.")
     fp16: bool = Field(False, description="Whether to use float16.")
+    fp32: bool = Field(False, description="Whether to use float32.")
+
+    bettertransformer: bool = Field(
+        False,
+        description="Whether to use BetterTransformer. See https://huggingface.co/docs/transformers/main/en/main_classes/model.html#transformers.BetterTransformer for details.",  # noqa
+    )
 
     @property
-    def torch_dtype(self) -> torch.dtype:
+    def torch_dtype(self) -> Optional[torch.dtype]:
         if self.bp16:
             return torch.bfloat16
         elif self.fp16:
             return torch.float16
-        else:
+        elif self.fp32:
             return torch.float32
+        return None
 
     def __hash__(self):
-        return hash(self.model_dump().values())
+        return hash(self.model_dump_json())
 
 
 class TaskEnum(str, Enum):
@@ -127,16 +134,13 @@ class VoiceActivityDetectionConfig(BaseModel):
     )
 
     mean_logprob_threshold: float = Field(
-        -0.5,
+        -0.6,
         le=0.0,
         description="Mean log probability threshold for each token. Greater value means more strict detection.",
     )
 
     blacklist: list[str] = Field(
-        [
-            "ご視聴ありがとうございました。",
-            "ご視聴ありがとうございました",
-        ],
+        ["ご視聴ありがとうございました。", "ご視聴ありがとうございました", "サブタイトル:ひかり"],
         description="Blacklist for transcripts. If transcript is in blacklist, it will be ignored.",
     )
 

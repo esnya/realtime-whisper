@@ -25,33 +25,44 @@ def load_models(
 ) -> Tuple[
     WhisperForConditionalGeneration, WhisperFeatureExtractor, WhisperTokenizerFast
 ]:
-    logger.info("Loading model %s", config)
+    logger.info("Loading model %s", config.model)
 
     model = WhisperForConditionalGeneration.from_pretrained(
         config.model,
     )
     assert isinstance(model, WhisperForConditionalGeneration)
-    model = model.to(
-        config.device,
-        config.torch_dtype,
-    )
+    if config.device or config.torch_dtype:
+        logger.info("Convert model to %s %s", config.device, config.torch_dtype)
+        model = model.to(
+            config.device or model.device,
+            config.torch_dtype,
+        )
+    if config.bettertransformer:
+        logger.info("Convert model to BetterTransformer")
+        model = model.to_bettertransformer()
+        assert isinstance(model, WhisperForConditionalGeneration)
+
+    logger.info("Configuring model")
     model.config.suppress_tokens = model.config.suppress_tokens and [
         id for id in model.config.suppress_tokens if id > 50257
     ]
     if model.generation_config is not None:
         model.generation_config.suppress_tokens = model.config.suppress_tokens
 
+    logger.info("Loading feature extractor and tokenizer")
     feature_extractor = WhisperFeatureExtractor.from_pretrained(config.model)
     assert isinstance(feature_extractor, WhisperFeatureExtractor)
 
     tokenizer = WhisperTokenizerFast.from_pretrained(config.model)
     assert isinstance(tokenizer, WhisperTokenizerFast)
 
+    logger.info("Model loaded")
     return model, feature_extractor, tokenizer
 
 
 class RealtimeWhisper(AsyncContextManager):
     def __init__(self, config: RealtimeWhisperConfig = RealtimeWhisperConfig()):  # type: ignore
+        logger.info("Initializing RealtimeWhisper")
         if config.vram_fraction:
             torch.cuda.set_per_process_memory_fraction(config.vram_fraction)
 
@@ -62,6 +73,8 @@ class RealtimeWhisper(AsyncContextManager):
         self.model, self.feature_extractor, self.tokenizer = load_models(config.whisper)
 
         self._clear_buffer()
+
+        logger.info("RealtimeWhisper initialized")
 
     async def __aenter__(self):
         return self
@@ -172,8 +185,10 @@ class RealtimeWhisper(AsyncContextManager):
 
     @torch.no_grad()
     async def __aiter__(self) -> AsyncIterator[str]:
+        logger.info("Streaming realtime transcription")
         while not self.stop_flag.is_set():
             transcription = await self.transcribe()
             torch.cuda.empty_cache()
             if transcription is not None:
                 yield transcription
+        logger.info("Streaming stopped")
