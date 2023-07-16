@@ -69,6 +69,7 @@ class RealtimeWhisper(AsyncContextManager):
         self.config = config
         self.forced_message = None
         self.stop_flag = asyncio.Event()
+        self.is_dirty = asyncio.Event()
         self.no_speech_pattern = re.compile(config.vad.no_speech_pattern)
         self.model, self.feature_extractor, self.tokenizer = load_models(config.whisper)
 
@@ -86,6 +87,7 @@ class RealtimeWhisper(AsyncContextManager):
         self.audio_buffer = np.concatenate((self.audio_buffer, audio))[
             -self.config.vad.max_frames :
         ]
+        self.is_dirty.set()
 
     def stop(self):
         self.stop_flag.set()
@@ -94,6 +96,11 @@ class RealtimeWhisper(AsyncContextManager):
         self.audio_buffer = np.empty(0, dtype=np.float32)
 
     async def transcribe(self):
+        if not self.is_dirty.is_set():
+            await asyncio.sleep(0)
+            return None
+        self.is_dirty.clear()
+
         logger.info("Transcribing %s frames", self.audio_buffer.size)
 
         if self.audio_buffer.size < self.config.vad.min_frames:
@@ -121,6 +128,14 @@ class RealtimeWhisper(AsyncContextManager):
         if max_volume > 1.0:
             logger.info("Invalid volume %s", max_volume)
             self._clear_buffer()
+            return None
+
+        if evr < self.config.vad.end_volume_ratio_threshold:
+            logger.info(
+                "End volume ratio %s < %s",
+                evr,
+                self.config.vad.end_volume_ratio_threshold,
+            )
             return None
 
         input_features = self.feature_extractor(

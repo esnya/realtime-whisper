@@ -104,7 +104,6 @@ class PydanticArgumentParser(ArgumentParser, Generic[T]):
                         action="+" if field_info.annotation is list else "store",
                         default=default,
                     )
-                    print(*names, get_inner_type(field_info.annotation))
 
     def _build_nested_dict(self, args: dict[str, Any]) -> dict[str, Any]:
         nested_dict = {}
