@@ -1,18 +1,36 @@
 name: Docker Image CI
 
 on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+  - push
 
 jobs:
 
-  build:
+  build-and-push:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag realtime-whisper:$(date +%s)
+    - uses: docker/setup-buildx-action@v1
+    - run: echo "BUILD_VERSION=$(grep version setup.cfg | cut -d'=' -f2 | tr -d '[:space:]')" >> $GITHUB_ENV
+    - run: echo "REF_NAME=$(echo ${{ github.ref_name }} | sed 's|/|-|g')" >> $GITHUB_ENV
+    - run: echo "TAG_PREFIX=docker.pkg.github.com/${{ github.repository_owner }}/${{ github.repository }}/" >> $GITHUB_ENV
+    - run: echo "BUILD_TAG=${{ env.TAG_PREFIX }}realtime-whisper:${{ env.REF_NAME }}-build.${{ github.run_number }}" >> $GITHUB_ENV
+    - env:
+        DOCKER_BUILDKIT: 1
+      run: docker build . --tag ${{ env.BUILD_TAG }}
+    - name: Login to GitHub Packages
+      uses: docker/login-action@v1
+      with:
+        registry: docker.pkg.github.com
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - run: docker push ${{ env.BUILD_TAG }}
+    - if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        docker tag ${{ env.BUILD_TAG }} ${{ env.TAG_PREFIX }}realtime-whisper:${{ env.REF_NAME }}
+        docker push ${{ env.TAG_PREFIX }}realtime-whisper:${{ env.REF_NAME }}
+    - if: github.ref == 'refs/heads/master'
+      run: |
+        docker tag ${{ env.BUILD_TAG }} ${{ env.TAG_PREFIX }}realtime-whisper:latest
+        docker push ${{ env.TAG_PREFIX }}realtime-whisper:latest
