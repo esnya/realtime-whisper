@@ -29,18 +29,23 @@ def load_models(
 
     model = WhisperForConditionalGeneration.from_pretrained(
         config.model,
+        load_in_4bit=config.load_in_4bit,
+        load_in_8bit=config.load_in_8bit,
     )
     assert isinstance(model, WhisperForConditionalGeneration)
-    if config.device or config.torch_dtype:
-        logger.info("Convert model to %s %s", config.device, config.torch_dtype)
+    if config.device or config.dtype:
+        logger.info("Convert model to %s %s", config.device, config.dtype)
         model = model.to(
             config.device or model.device,
-            config.torch_dtype,
+            config.dtype,
         )
-    if config.bettertransformer:
+    if config.better_transformer:
         logger.info("Convert model to BetterTransformer")
         model = model.to_bettertransformer()
         assert isinstance(model, WhisperForConditionalGeneration)
+
+    if config.compile:
+        model.generate = torch.compile(model.generate)
 
     logger.info("Configuring model")
     model.config.suppress_tokens = model.config.suppress_tokens and [
@@ -56,7 +61,7 @@ def load_models(
     tokenizer = WhisperTokenizerFast.from_pretrained(config.model)
     assert isinstance(tokenizer, WhisperTokenizerFast)
 
-    logger.info("Model loaded")
+    logger.info("Model loaded: %s, %s", model.device, model.dtype)
     return model, feature_extractor, tokenizer
 
 
@@ -95,6 +100,7 @@ class RealtimeWhisper(AsyncContextManager):
     def _clear_buffer(self):
         self.audio_buffer = np.empty(0, dtype=np.float32)
 
+    @torch.inference_mode()
     async def transcribe(self):
         if not self.is_dirty.is_set():
             await asyncio.sleep(0)
@@ -121,6 +127,7 @@ class RealtimeWhisper(AsyncContextManager):
         if max_volume == 0.0:
             logger.info("Zero volume")
             self._clear_buffer()
+            await asyncio.sleep(self.config.vad.sleep_duration)
             return None
 
         evr = (max_volume - end_volume) / max_volume
@@ -128,6 +135,7 @@ class RealtimeWhisper(AsyncContextManager):
         if max_volume > 1.0:
             logger.info("Invalid volume %s", max_volume)
             self._clear_buffer()
+            await asyncio.sleep(self.config.vad.sleep_duration)
             return None
 
         if evr < self.config.vad.end_volume_ratio_threshold:
@@ -195,6 +203,9 @@ class RealtimeWhisper(AsyncContextManager):
                 ),
             },
         )
+
+        if self.config.memory_summary:
+            logger.info(torch.cuda.memory_summary())
 
         return transcription if accept else None
 

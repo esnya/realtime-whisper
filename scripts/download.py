@@ -1,11 +1,10 @@
 from argparse import ArgumentParser
 
 from transformers import (
-    AutoFeatureExtractor,
-    AutoModelForSpeechSeq2Seq,
-    AutoProcessor,
-    AutoTokenizer,
-    PreTrainedModel,
+    WhisperFeatureExtractor,
+    WhisperForConditionalGeneration,
+    WhisperProcessor,
+    WhisperTokenizer,
 )
 
 parser = ArgumentParser()
@@ -15,15 +14,16 @@ parser.add_argument("--safe-serialize", "-s", action="store_true")
 
 args = parser.parse_args()
 
-for cls in [AutoProcessor, AutoTokenizer, AutoFeatureExtractor]:
+for cls in [WhisperProcessor, WhisperTokenizer, WhisperFeatureExtractor]:
     instance = cls.from_pretrained(args.pretrained_model_name_or_path)
     instance.save_pretrained(args.save_directory)
     instance.save_pretrained(args.save_directory + "-fp16")
     instance.save_pretrained(args.save_directory + "-bf16")
 
-model: PreTrainedModel = AutoModelForSpeechSeq2Seq.from_pretrained(
+model = WhisperForConditionalGeneration.from_pretrained(
     args.pretrained_model_name_or_path
 )
+assert isinstance(model, WhisperForConditionalGeneration)
 model.save_pretrained(args.save_directory, safe_serialize=args.safe_serialize)
 
 model.half().save_pretrained(

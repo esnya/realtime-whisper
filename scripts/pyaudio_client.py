@@ -5,13 +5,11 @@ import pyaudio
 from websockets.client import connect
 
 
-async def pyaudio_client():
-    async with connect("ws://localhost:8760") as websocket:
+async def pyaudio_client(url: str = "ws://localhost:8760"):
+    async with connect(url) as websocket:
 
         async def writer():
             pa = pyaudio.PyAudio()
-
-            loop = asyncio.get_event_loop()
 
             audio_queue = deque()
 
@@ -47,4 +45,10 @@ async def pyaudio_client():
 
 
 if __name__ == "__main__":
-    asyncio.run(pyaudio_client())
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument("--url", type=str, default="ws://localhost:8760")
+    args = parser.parse_args()
+
+    asyncio.run(pyaudio_client(**args.__dict__))

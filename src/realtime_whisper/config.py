@@ -21,6 +21,17 @@ class WhisperModelConfig(BaseModel):
         "openai/whisper-medium",
         description="Model name to load. Repository name or local path.",
     )
+
+    load_in_8bit: bool = Field(
+        False,
+        description="Whether to load model in 8bit. See https://huggingface.co/docs/transformers/main_classes/quantization for details.",  # noqa
+    )
+
+    load_in_4bit: bool = Field(
+        False,
+        description="Whether to load model in 4bit. See https://huggingface.co/docs/transformers/main_classes/quantization for details.",  # noqa
+    )
+
     device: Optional[str] = Field(
         None,
         description="Device to load model on.",
@@ -30,13 +41,18 @@ class WhisperModelConfig(BaseModel):
     fp16: bool = Field(False, description="Whether to use float16.")
     fp32: bool = Field(False, description="Whether to use float32.")
 
-    bettertransformer: bool = Field(
+    better_transformer: bool = Field(
         False,
         description="Whether to use BetterTransformer. See https://huggingface.co/docs/transformers/main/en/main_classes/model.html#transformers.BetterTransformer for details.",  # noqa
     )
 
+    compile: bool = Field(
+        False,
+        description="Whether to use torch.jit.compile on model.generate. See https://pytorch.org/docs/stable/jit.html#torch.jit.compile for details.",  # noqa
+    )
+
     @property
-    def torch_dtype(self) -> Optional[torch.dtype]:
+    def dtype(self) -> Optional[torch.dtype]:
         if self.bp16:
             return torch.bfloat16
         elif self.fp16:
@@ -122,7 +138,7 @@ class VoiceActivityDetectionConfig(BaseModel):
         return int(self.end_duration * self.sampling_rate)
 
     end_volume_ratio_threshold: float = Field(
-        0.8,
+        0.6,
         ge=0.0,
         description="Volume ratio threshold for voice termination detection. max volume for hole audio / max volume for end edge audio.",  # noqa
     )
@@ -147,6 +163,12 @@ class VoiceActivityDetectionConfig(BaseModel):
     no_speech_pattern: re.Pattern[str] = Field(
         re.compile(r"^[([（【]"),
         description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
+    )
+
+    sleep_duration: float = Field(
+        0.1,
+        ge=0.0,
+        description="Sleep duration in seconds for no speech detection. For reducing CPU usage.",
     )
 
 
@@ -174,6 +196,11 @@ class RealtimeWhisperConfig(BaseSettings):
     whisper: WhisperModelConfig = WhisperModelConfig()  # type: ignore
     generation: GenerationConfig = GenerationConfig()  # type: ignore
     vad: VoiceActivityDetectionConfig = VoiceActivityDetectionConfig()  # type: ignore
+
+    memory_summary: bool = Field(
+        False,
+        description="Whether to print memory summary after each inference.",
+    )
 
     vram_fraction: Optional[float] = Field(
         None,
