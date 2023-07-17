@@ -103,7 +103,7 @@ class RealtimeWhisper(AsyncContextManager):
     @torch.inference_mode()
     async def transcribe(self):
         if not self.is_dirty.is_set():
-            await asyncio.sleep(0)
+            await asyncio.sleep(self.config.vad.sleep_duration)
             return None
         self.is_dirty.clear()
 
