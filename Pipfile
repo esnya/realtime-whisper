@@ -19,6 +19,8 @@ torch = {version = "*", index = "downloadpytorch"}
 torchaudio = {version = "*", index = "downloadpytorch"}
 transformers = "*"
 websockets = "*"
+aiohttp = ">=3.8.5"
+certifi = ">=2023.07.22"
 
 [dev-packages]
 bandit = "*"
