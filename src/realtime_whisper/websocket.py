@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import numpy as np
@@ -25,8 +26,19 @@ async def serve_websocket(
 
             async def writer():
                 while not websocket.closed:
-                    async for transcription in whisper:
-                        await websocket.send(transcription)
+                    async for transcription, score in whisper:
+                        if config.output_format == "json":
+                            await websocket.send(
+                                json.dumps(
+                                    {
+                                        "transcription": transcription,
+                                        "score": score,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                            )
+                        else:
+                            await websocket.send(transcription)
 
             await asyncio.gather(reader(), writer())
 

@@ -195,6 +195,11 @@ class LoggingConfig(BaseModel):
     )
 
 
+class OutputFormatEnum(str, Enum):
+    transcript = "transcript"
+    json = "json"
+
+
 class RealtimeWhisperConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="CONFIG_",
@@ -209,6 +214,11 @@ class RealtimeWhisperConfig(BaseSettings):
     whisper: WhisperModelConfig = WhisperModelConfig()  # type: ignore
     generation: GenerationConfig = GenerationConfig()  # type: ignore
     vad: VoiceActivityDetectionConfig = VoiceActivityDetectionConfig()  # type: ignore
+
+    output_format: OutputFormatEnum = Field(
+        OutputFormatEnum.transcript,
+        description="Output format.",
+    )
 
     memory_summary: bool = Field(
         False,

@@ -2,7 +2,7 @@ import asyncio
 from functools import cache
 import logging
 import re
-from typing import AsyncContextManager, AsyncIterator, Tuple
+from typing import Any, AsyncContextManager, AsyncIterator, Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -110,7 +110,7 @@ class RealtimeWhisper(AsyncContextManager):
         self.audio_buffer = np.empty(0, dtype=np.float32)
 
     @torch.inference_mode()
-    async def transcribe(self):
+    async def transcribe(self) -> Optional[Tuple[str, Dict[str, Any]]]:
         if not self.is_dirty.is_set():
             await asyncio.sleep(self.config.vad.sleep_duration)
             return None
@@ -185,11 +185,13 @@ class RealtimeWhisper(AsyncContextManager):
             model_outputs.sequences[0], skip_special_tokens=True
         )
 
+        eos = model_outputs.sequences[0][-1].item() == self.tokenizer.eos_token_id
+
         accept = (
             transcription not in self.config.vad.blacklist
             and evr > self.config.vad.end_volume_ratio_threshold
             and last_logprob > self.config.vad.eos_logprob_threshold
-            and model_outputs.sequences[0][-1].item() == self.tokenizer.eos_token_id
+            and eos
             and mean_logprob > self.config.vad.mean_logprob_threshold
             and self.no_speech_pattern.search(transcription) is None
         )
@@ -205,8 +207,7 @@ class RealtimeWhisper(AsyncContextManager):
                 "MeanLogprob": mean_logprob,
                 "SumLogprob": sum_logprob,
                 "EosLogprob": last_logprob,
-                "EoS": model_outputs.sequences[0][-1].item()
-                == self.tokenizer.eos_token_id,
+                "EoS": eos,
                 "Transcription": self.tokenizer.decode(
                     model_outputs.sequences[0], skip_special_tokens=False
                 ),
@@ -216,10 +217,23 @@ class RealtimeWhisper(AsyncContextManager):
         if self.config.memory_summary:
             logger.info(torch.cuda.memory_summary())
 
-        return transcription if accept else None
+        return (
+            (
+                transcription,
+                dict(
+                    evr=evr,
+                    mean_logprob=mean_logprob,
+                    sum_logprob=sum_logprob,
+                    last_logprob=last_logprob,
+                    eos=eos,
+                ),
+            )
+            if accept
+            else None
+        )
 
     @torch.no_grad()
-    async def __aiter__(self) -> AsyncIterator[str]:
+    async def __aiter__(self) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
         logger.info("Streaming realtime transcription")
         while not self.stop_flag.is_set():
             transcription = await self.transcribe()
