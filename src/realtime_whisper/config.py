@@ -2,7 +2,7 @@ from enum import Enum
 import re
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
-
+from transformers import BitsAndBytesConfig
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import torch
@@ -37,7 +37,7 @@ class WhisperModelConfig(BaseModel):
         description="Device to load model on.",
         examples=["cpu", "cuda"],
     )
-    bp16: bool = Field(False, description="Whether to use bfloat16.")
+    bf16: bool = Field(False, description="Whether to use bfloat16.")
     fp16: bool = Field(False, description="Whether to use float16.")
     fp32: bool = Field(False, description="Whether to use float32.")
 
@@ -52,8 +52,21 @@ class WhisperModelConfig(BaseModel):
     )
 
     @property
+    def quantization_config(self) -> Optional[BitsAndBytesConfig]:
+        if not (self.load_in_8bit or self.load_in_4bit):
+            return None
+
+        dtype = self.bf16 and torch.bfloat16 or torch.float16
+        return BitsAndBytesConfig(
+            load_in_4bit=self.load_in_4bit,
+            load_in_8bit=self.load_in_8bit,
+            bnb_4bit_compute_dtype=dtype,
+            bnb_8bit_compute_dtype=dtype,
+        )
+
+    @property
     def dtype(self) -> Optional[torch.dtype]:
-        if self.bp16:
+        if self.bf16:
             return torch.bfloat16
         elif self.fp16:
             return torch.float16

@@ -31,9 +31,18 @@ def load_models(
         config.model,
         load_in_4bit=config.load_in_4bit,
         load_in_8bit=config.load_in_8bit,
+        torch_dtype=config.dtype,
     )
     assert isinstance(model, WhisperForConditionalGeneration)
-    if config.device or config.dtype:
+    logger.info(
+        "Model loaded: %s on %s as %s", model.name_or_path, model.device, model.dtype
+    )
+    if (
+        config.device
+        and config.device != model.device.type
+        or config.dtype
+        and config.dtype != model.dtype
+    ):
         logger.info("Convert model to %s %s", config.device, config.dtype)
         model = model.to(
             config.device or model.device,
