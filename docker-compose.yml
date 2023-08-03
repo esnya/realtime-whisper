@@ -1,0 +1,15 @@
+version: "3.7"
+
+services:
+  realtime-whisper:
+    build: .
+    image: realtime-whisper
+    ports:
+      - 8760:8760
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [utility, compute]
