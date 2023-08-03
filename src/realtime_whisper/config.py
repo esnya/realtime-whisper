@@ -141,7 +141,7 @@ class VoiceActivityDetectionConfig(BaseModel):
     )
 
     end_duration: float = Field(
-        0.2,
+        0.4,
         gt=0.0,
         description="End side duration in seconds for voice termination detection.",
     )
@@ -157,7 +157,7 @@ class VoiceActivityDetectionConfig(BaseModel):
     )
 
     eos_logprob_threshold: float = Field(
-        -0.15,
+        -0.2,
         le=0.0,
         description="Log probability threshold for end of transcripton. Greater value means more strict detection.",
     )
@@ -174,7 +174,7 @@ class VoiceActivityDetectionConfig(BaseModel):
     )
 
     no_speech_pattern: re.Pattern[str] = Field(
-        re.compile(r"^[([（【]"),
+        re.compile(r"^[([（【♪]"),
         description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
     )
 
