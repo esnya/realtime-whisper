@@ -183,6 +183,11 @@ class VoiceActivityDetectionConfig(BaseModel):
         description="Blacklist for transcripts. If transcript is in blacklist, it will be ignored.",
     )
 
+    cleaning_pattern: re.Pattern[str] = Field(
+        re.compile(r"お(だしょー|ついち)(さん)?:"),
+        description="Pattern for removed from transcripts.",
+    )
+
     no_speech_pattern: re.Pattern[str] = Field(
         re.compile(r"^[([（【♪-]"),
         description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",

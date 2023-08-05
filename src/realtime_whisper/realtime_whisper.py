@@ -238,6 +238,7 @@ class RealtimeWhisper(AsyncContextManager):
         transcription: str = self.tokenizer.decode(
             model_outputs.sequences[0], skip_special_tokens=True
         )
+        transcription = self.config.vad.cleaning_pattern.sub("", transcription)
 
         eos = model_outputs.sequences[0][-1].item() == self.tokenizer.eos_token_id
 
