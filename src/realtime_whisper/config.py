@@ -174,8 +174,20 @@ class VoiceActivityDetectionConfig(BaseModel):
     )
 
     no_speech_pattern: re.Pattern[str] = Field(
-        re.compile(r"^[([（【♪]"),
+        re.compile(r"^[([（【♪-]"),
         description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
+    )
+
+    force_stop_words: List[str] = Field(
+        [
+            "<|notimestamps|>(",
+            "<|notimestamps|>[",
+            "<|notimestamps|>（",
+            "<|notimestamps|>【",
+            "<|notimestamps|>-",
+            "<|notimestamps|>♪",
+        ],
+        description="First tokens for no speech detection. If transcript contains sequence of the tokens, generration will be halted.",  # noqa
     )
 
     sleep_duration: float = Field(

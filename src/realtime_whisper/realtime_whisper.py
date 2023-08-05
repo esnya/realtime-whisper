@@ -2,7 +2,16 @@ import asyncio
 from functools import cache
 import logging
 import re
-from typing import Any, AsyncContextManager, AsyncIterator, Dict, Optional, Tuple
+from typing import (
+    Any,
+    AsyncContextManager,
+    AsyncIterator,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    cast,
+)
 
 import numpy as np
 import torch
@@ -11,6 +20,8 @@ from transformers import (
     WhisperFeatureExtractor,
     WhisperForConditionalGeneration,
     WhisperTokenizerFast,
+    StoppingCriteria,
+    StoppingCriteriaList,
 )
 
 
@@ -74,6 +85,36 @@ def load_models(
     return model, feature_extractor, tokenizer
 
 
+class ForseStopWordsStoppingCriteria(StoppingCriteria):
+    def __init__(self, force_stop_words_ids: List[List[int]]):
+        self.force_stop_words_ids = [
+            torch.LongTensor(force_stop_word_ids)
+            for force_stop_word_ids in force_stop_words_ids
+        ]
+        assert all([word_ids.dim() == 1 for word_ids in self.force_stop_words_ids])
+
+    def __call__(
+        self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs
+    ) -> bool:
+        results = torch.zeros(
+            (input_ids.shape[0]), dtype=torch.bool, device=input_ids.device
+        )
+        inputs_len = input_ids.shape[1]
+
+        if self.force_stop_words_ids[0].device != input_ids.device:
+            self.force_stop_words_ids = [
+                word_ids.to(input_ids.device) for word_ids in self.force_stop_words_ids
+            ]
+
+        for word_ids in self.force_stop_words_ids:
+            word_ids_len = word_ids.shape[-1]
+            if inputs_len < word_ids_len:
+                continue
+            results |= (input_ids[:, -word_ids_len:] == word_ids).all(dim=-1)
+
+        return cast(bool, results.all().item())
+
+
 class RealtimeWhisper(AsyncContextManager):
     def __init__(self, config: RealtimeWhisperConfig = RealtimeWhisperConfig()):  # type: ignore
         logger.info("Initializing RealtimeWhisper")
@@ -87,7 +128,16 @@ class RealtimeWhisper(AsyncContextManager):
         self.no_speech_pattern = re.compile(config.vad.no_speech_pattern)
         self.model, self.feature_extractor, self.tokenizer = load_models(config.whisper)
 
-        self._clear_buffer()
+        self.stopping_criteria = StoppingCriteriaList(
+            (
+                ForseStopWordsStoppingCriteria(
+                    [
+                        self.tokenizer.encode(word, add_special_tokens=False)
+                        for word in config.vad.force_stop_words
+                    ],
+                ),
+            )
+        )
 
         logger.info("RealtimeWhisper initialized")
 
@@ -165,6 +215,7 @@ class RealtimeWhisper(AsyncContextManager):
             self.model.generate,
             input_features,
             **self.config.generation.model_dump(exclude_none=True),
+            stopping_criteria=self.stopping_criteria,
             max_new_tokens=max_new_tokens,
             return_dict_in_generate=True,
             output_scores=True,
