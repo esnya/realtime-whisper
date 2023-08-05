@@ -169,10 +169,10 @@ class RealtimeWhisper(AsyncContextManager):
             return None
         self.is_dirty.clear()
 
-        logger.info("Transcribing %s frames", self.audio_buffer.size)
+        logger.debug("Transcribing %s frames", self.audio_buffer.size)
 
         if self.audio_buffer.size < self.config.vad.min_frames:
-            logger.info(
+            logger.debug(
                 "Not enough frames (%s < %s)",
                 self.audio_buffer.size,
                 self.config.vad.min_frames,
@@ -187,7 +187,7 @@ class RealtimeWhisper(AsyncContextManager):
         end_volume = np.max(self.audio_buffer[-self.config.vad.end_frames :])
 
         if max_volume == 0.0:
-            logger.info("Zero volume")
+            logger.debug("Zero volume")
             self._clear_buffer()
             await asyncio.sleep(self.config.vad.sleep_duration)
             return None
@@ -195,13 +195,13 @@ class RealtimeWhisper(AsyncContextManager):
         evr = (max_volume - end_volume) / max_volume
 
         if max_volume > 1.0:
-            logger.info("Invalid volume %s", max_volume)
+            logger.debug("Invalid volume %s", max_volume)
             self._clear_buffer()
             await asyncio.sleep(self.config.vad.sleep_duration)
             return None
 
         if evr < self.config.vad.end_volume_ratio_threshold:
-            logger.info(
+            logger.debug(
                 "End volume ratio %s < %s",
                 evr,
                 self.config.vad.end_volume_ratio_threshold,

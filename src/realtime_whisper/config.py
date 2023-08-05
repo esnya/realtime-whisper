@@ -1,6 +1,6 @@
 from enum import Enum
 import re
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field
 from transformers import BitsAndBytesConfig
 from pydantic_settings import BaseSettings, SettingsConfigDict
