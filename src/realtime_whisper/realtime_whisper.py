@@ -126,6 +126,7 @@ class RealtimeWhisper(AsyncContextManager):
         self.stop_flag = asyncio.Event()
         self.is_dirty = asyncio.Event()
         self.no_speech_pattern = re.compile(config.vad.no_speech_pattern)
+        self.stride_frames = config.vad.stride_frames
         self.model, self.feature_extractor, self.tokenizer = load_models(config.whisper)
 
         self.stopping_criteria = StoppingCriteriaList(
@@ -138,6 +139,8 @@ class RealtimeWhisper(AsyncContextManager):
                 ),
             )
         )
+
+        self.audio_buffer = np.zeros((0,), dtype=np.float32)
 
         logger.info("RealtimeWhisper initialized")
 
@@ -157,7 +160,7 @@ class RealtimeWhisper(AsyncContextManager):
         self.stop_flag.set()
 
     def _clear_buffer(self):
-        self.audio_buffer = np.empty(0, dtype=np.float32)
+        self.audio_buffer = self.audio_buffer[-self.stride_frames :]
 
     @torch.inference_mode()
     async def transcribe(self) -> Optional[Tuple[str, Dict[str, Any]]]:

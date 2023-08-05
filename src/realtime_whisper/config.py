@@ -150,6 +150,16 @@ class VoiceActivityDetectionConfig(BaseModel):
     def end_frames(self) -> int:
         return int(self.end_duration * self.sampling_rate)
 
+    stride: float = Field(
+        0.8,
+        gt=0.0,
+        description="Stride duration in seconds for voice termination detection.",
+    )
+
+    @property
+    def stride_frames(self) -> int:
+        return int(self.stride * self.sampling_rate)
+
     end_volume_ratio_threshold: float = Field(
         0.6,
         ge=0.0,
