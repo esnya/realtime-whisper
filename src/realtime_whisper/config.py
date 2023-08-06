@@ -184,7 +184,7 @@ class VoiceActivityDetectionConfig(BaseModel):
     )
 
     cleaning_pattern: re.Pattern[str] = Field(
-        re.compile(r"お(だしょー|ついち)(さん)?:"),
+        re.compile(r"(おだしょー|おついち|ちょまど)(さん)?:"),
         description="Pattern for removed from transcripts.",
     )
 
