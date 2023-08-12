@@ -1,81 +1,63 @@
-from enum import Enum
 import re
-from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
-from transformers import BitsAndBytesConfig
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from enum import Enum
+from typing import List, Literal, Optional, Union
 
 import torch
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from transformers import BitsAndBytesConfig
+from typing_extensions import Annotated
 
 
-class WebsocketConfig(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-    )
-    host: str = Field("localhost", description="Host to listen on.")
-    port: int = Field(8760, description="Port to listen on.")
+def parse_torch_dtype_or_auto(value: str) -> Union[torch.dtype, Literal["auto"]]:
+    if value == "auto":
+        return "auto"
+    dtype = getattr(torch, value)
+    if not isinstance(dtype, torch.dtype):
+        raise ValueError(f"{value} is not a valid torch.dtype.")
+    return dtype
 
 
-class WhisperModelConfig(BaseModel):
-    model: str = Field(
-        "openai/whisper-medium",
-        description="Model name to load. Repository name or local path.",
-    )
+TorchDTypeOrAuto = Annotated[
+    Union[torch.dtype, Literal["auto"]], BeforeValidator(parse_torch_dtype_or_auto)
+]
 
-    load_in_8bit: bool = Field(
-        False,
-        description="Whether to load model in 8bit. See https://huggingface.co/docs/transformers/main_classes/quantization for details.",  # noqa
-    )
 
-    load_in_4bit: bool = Field(
-        False,
-        description="Whether to load model in 4bit. See https://huggingface.co/docs/transformers/main_classes/quantization for details.",  # noqa
-    )
+class BitsAndBytesConfigModelBase(BaseModel):
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    device: Optional[str] = Field(
-        None,
-        description="Device to load model on.",
-        examples=["cpu", "cuda"],
-    )
-    bf16: bool = Field(False, description="Whether to use bfloat16.")
-    fp16: bool = Field(False, description="Whether to use float16.")
-    fp32: bool = Field(False, description="Whether to use float32.")
+    load_in_4bit: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to load weights in 4 bits.",
+        ),
+    ] = None
+    load_in_8bit: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to load weights in 8 bits.",
+        ),
+    ] = None
+    bnb_4bit_compute_dtype: Annotated[
+        Optional[TorchDTypeOrAuto],
+        Field(
+            description="Torch dtype for 4 bit compute.",
+        ),
+    ] = None
+    bnb_8bit_compute_dtype: Annotated[
+        Optional[TorchDTypeOrAuto],
+        Field(
+            description="Torch dtype for 8 bit compute.",
+        ),
+    ] = None
 
-    better_transformer: bool = Field(
-        False,
-        description="Whether to use BetterTransformer. See https://huggingface.co/docs/transformers/main/en/main_classes/model.html#transformers.BetterTransformer for details.",  # noqa
-    )
 
-    compile: bool = Field(
-        False,
-        description="Whether to use torch.jit.compile on model.generate. See https://pytorch.org/docs/stable/jit.html#torch.jit.compile for details.",  # noqa
-    )
-
-    @property
-    def quantization_config(self) -> Optional[BitsAndBytesConfig]:
-        if not (self.load_in_8bit or self.load_in_4bit):
-            return None
-
-        dtype = self.bf16 and torch.bfloat16 or torch.float16
-        return BitsAndBytesConfig(
-            load_in_4bit=self.load_in_4bit,
-            load_in_8bit=self.load_in_8bit,
-            bnb_4bit_compute_dtype=dtype,
-            bnb_8bit_compute_dtype=dtype,
-        )
-
-    @property
-    def dtype(self) -> Optional[torch.dtype]:
-        if self.bf16:
-            return torch.bfloat16
-        elif self.fp16:
-            return torch.float16
-        elif self.fp32:
-            return torch.float32
-        return None
-
-    def __hash__(self):
-        return hash(self.model_dump_json())
+BitsAndBytesConfigModel = Annotated[
+    BitsAndBytesConfigModelBase,
+    AfterValidator(
+        lambda value: value if value is None else BitsAndBytesConfig(**value)
+    ),
+]
 
 
 class TaskEnum(str, Enum):
@@ -83,148 +65,370 @@ class TaskEnum(str, Enum):
     translate = "translate"  # type: ignore
 
 
+class WebsocketConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    serve: Annotated[
+        bool, Field(description="Whether to enable websocket server.")
+    ] = False
+    host: Annotated[str, Field(description="Host to listen on.")] = "localhost"
+    port: Annotated[int, Field(description="Port to listen on.")] = 8760
+
+
+class ModelLoadConfig(BaseModel):
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    device_map: Annotated[
+        Optional[Union[str, dict[str, str]]],
+        Field(
+            description="Device map for model.",
+            examples=["cpu", "auto", "cuda", "cuda:0"],
+        ),
+    ] = None
+    torch_dtype: Annotated[
+        Optional[TorchDTypeOrAuto],
+        Field(
+            description="Torch dtype for model.",
+            examples=["auto", "float32", "float16", "bfloat16"],
+        ),
+    ] = None
+    quantization_config: Annotated[
+        Optional[BitsAndBytesConfigModel],
+        Field(
+            description="Quantization config for model.",
+        ),
+    ] = None
+
+
+class WhisperModelConfig(ModelLoadConfig, BaseModel):
+    model: Annotated[
+        str,
+        Field(
+            description="Model name or path.",
+        ),
+    ] = "openai/whisper-medium"
+
+
+class LanguageIdentificationModelConfig(ModelLoadConfig, BaseModel):
+    model: Annotated[
+        str,
+        Field(
+            description="Model name or path.",
+        ),
+    ] = "facebook/mms-lid-4017"
+
+
 class GenerationConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    task: TaskEnum = Field("transcribe", description="Task to perform.")
-    language: str = Field(
-        "en", description="Language to translate to.", examples=["en", "ja"]
-    )
-    num_beams: int = Field(
-        1,
-        ge=1,
-        description="Number of beams for beam search. 1 means no beam search.",
-    )
-    do_sample: bool = Field(
-        False, description="Whether to use sampling for generation."
-    )
+    task: Annotated[
+        TaskEnum, Field(description="Task to perform.")
+    ] = TaskEnum.transcribe
+
+    num_beams: Annotated[
+        int,
+        Field(
+            ge=1,
+            description="Number of beams for beam search. 1 means no beam search.",
+        ),
+    ] = 2
+
+    do_sample: Annotated[
+        bool,
+        Field(description="Whether to use sampling for generation."),
+    ] = True
 
 
 class VoiceActivityDetectionConfig(BaseModel):
-    sampling_rate: int = Field(
-        16000,
-        description="Sampling rate in Hz.Most models were trained on 16000Hz audio.",
-    )
+    sampling_rate: Annotated[
+        int,
+        Field(
+            description="Sampling rate in Hz.Most models were trained on 16000Hz audio.",
+        ),
+    ] = 16000
 
-    max_tokens_per_second: int = Field(
-        10,
-        description="Max new tokens generated per second. Reduce GPU usage with shorter audio.",
-    )
+    max_tokens_per_second: Annotated[
+        int,
+        Field(
+            description="Max new tokens generated per second. Reduce GPU usage with shorter audio.",
+        ),
+    ] = 10
 
     @property
     def max_tokens_per_frame(self) -> float:
         return self.max_tokens_per_second / self.sampling_rate
 
-    max_duration: float = Field(
-        20,
-        description="Max audio duration in seconds. Maximum duration for most models is 30 seconds.",
-    )
+    max_duration: Annotated[
+        float,
+        Field(
+            description="Max audio duration in seconds. Maximum duration for most models is 30 seconds.",
+        ),
+    ] = 20
 
     @property
     def max_frames(self) -> int:
         return int(self.max_duration * self.sampling_rate)
 
-    min_duration: float = Field(
-        5,
-        description="Min audio duration in seconds. Whisper will sleep until this duration is reached.",
-    )
+    min_duration: Annotated[
+        float,
+        Field(
+            description="Min audio duration in seconds. Whisper will sleep until this duration is reached.",
+        ),
+    ] = 2
 
     @property
     def min_frames(self) -> int:
         return int(self.min_duration * self.sampling_rate)
 
-    min_volume: float = Field(
-        0.2,
-        ge=0.0,
-        le=1.0,
-        description="Minimum threshold for hole audio volume. If maximum volume is lower than this threshold, audio will be ignored.",  # noqa
-    )
-
-    end_duration: float = Field(
-        0.4,
-        gt=0.0,
-        description="End side duration in seconds for voice termination detection.",
-    )
-
-    @property
-    def end_frames(self) -> int:
-        return int(self.end_duration * self.sampling_rate)
-
-    stride: float = Field(
-        0.8,
-        gt=0.0,
-        description="Stride duration in seconds for voice termination detection.",
-    )
+    stride: Annotated[
+        float,
+        Field(
+            gt=0.0,
+            description="Stride duration in seconds for voice termination detection.",
+        ),
+    ] = 0.8
 
     @property
     def stride_frames(self) -> int:
         return int(self.stride * self.sampling_rate)
 
-    end_volume_ratio_threshold: float = Field(
-        0.6,
-        ge=0.0,
-        description="Volume ratio threshold for voice termination detection. max volume for hole audio / max volume for end edge audio.",  # noqa
-    )
+    lid_score_threshold: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            description="Language identification score threshold for voice termination detection. Greater value means more strict detection.",  # noqa
+        ),
+    ] = 0.4
 
-    eos_logprob_threshold: float = Field(
-        -0.2,
-        le=0.0,
-        description="Log probability threshold for end of transcripton. Greater value means more strict detection.",
-    )
+    min_logprob_threshold: Annotated[
+        float,
+        Field(
+            le=0.0,
+            description="Sum log probability threshold for each token. Greater value means more strict detection.",
+        ),
+    ] = -1000
 
-    mean_logprob_threshold: float = Field(
-        -0.6,
-        le=0.0,
-        description="Mean log probability threshold for each token. Greater value means more strict detection.",
-    )
+    sum_logprob_threshold: Annotated[
+        float,
+        Field(
+            le=0.0,
+            description="Sum log probability threshold for each token. Greater value means more strict detection.",
+        ),
+    ] = -1000
 
-    blacklist: list[str] = Field(
-        ["ご視聴ありがとうございました。", "ご視聴ありがとうございました", "サブタイトル:ひかり"],
-        description="Blacklist for transcripts. If transcript is in blacklist, it will be ignored.",
-    )
+    mean_logprob_threshold: Annotated[
+        float,
+        Field(
+            le=0.0,
+            description="Mean log probability threshold for each token. Greater value means more strict detection.",
+        ),
+    ] = -0.6
 
-    cleaning_pattern: re.Pattern[str] = Field(
-        re.compile(r"(おだしょー|おついち|ちょまど)(さん)?:"),
-        description="Pattern for removed from transcripts.",
-    )
+    eos_logprob_threshold: Annotated[
+        float,
+        Field(
+            le=0.0,
+            description="Log probability threshold for end of transcripton. Greater value means more strict detection.",
+        ),
+    ] = -0.2
 
-    no_speech_pattern: re.Pattern[str] = Field(
-        re.compile(r"^[([（【♪-]"),
-        description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
-    )
+    non_speech_logprob_threshold: Annotated[
+        float,
+        Field(
+            le=0.0,
+            description="Log probability threshold for non speech. Smaller value means more strict detection.",
+        ),
+    ] = 0
 
-    force_stop_words: List[str] = Field(
-        [
-            "<|notimestamps|>(",
-            "<|notimestamps|>[",
-            "<|notimestamps|>（",
-            "<|notimestamps|>【",
-            "<|notimestamps|>-",
-            "<|notimestamps|>♪",
-        ],
-        description="First tokens for no speech detection. If transcript contains sequence of the tokens, generration will be halted.",  # noqa
-    )
+    blacklist: Annotated[
+        List[str],
+        Field(
+            description="Blacklist for transcripts. If transcript is in blacklist, it will be ignored.",
+        ),
+    ] = ["ご視聴ありがとうございました。", "ご視聴ありがとうございました", "サブタイトル:ひかり"]
 
-    sleep_duration: float = Field(
-        0.1,
-        ge=0.0,
-        description="Sleep duration in seconds for no speech detection. For reducing CPU usage.",
-    )
+    cleaning_pattern: Annotated[
+        re.Pattern[str],
+        Field(
+            description="Pattern for removed from transcripts.",
+        ),
+    ] = re.compile(r"(おだしょー|おついち|ちょまど)(さん)?:")
+
+    no_speech_pattern: Annotated[
+        re.Pattern[str],
+        Field(
+            description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
+        ),
+    ] = re.compile(r"^[([（【♪-]")
+
+    sleep_duration: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            description="Sleep duration in seconds for no speech detection. For reducing CPU usage.",
+        ),
+    ] = 0.1
 
 
 class LoggingConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    level: str = Field(
-        "WARNING",
-        description="Global logging level.",
-        examples=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-    )
+    level: Annotated[
+        str,
+        Field(
+            description="Global logging level.",
+            examples=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        ),
+    ] = "WARNING"
 
 
 class OutputFormatEnum(str, Enum):
     transcript = "transcript"
     json = "json"
+
+
+class BackendConfig(BaseModel):
+    per_process_vram_fraction: Annotated[
+        Optional[float],
+        Field(
+            ge=0.0,
+            le=1.0,
+            description="Fraction of GPU memory to allocate per process. If None, all available memory will be used.",
+        ),
+    ] = None
+
+    show_memory_summary: Annotated[
+        bool,
+        Field(
+            description="Whether to print memory summary after each inference.",
+        ),
+    ] = False
+
+    allow_fp16_reduced_precision_reduction: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to allow fp16 reduced precision reduction.",
+        ),
+    ] = None
+
+    allow_bf16_reduced_precision_reduction: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to allow bf16 reduced precision reduction.",
+        ),
+    ] = None
+
+    enable_flash_sdp: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to enable flash scaled dot product attention.",
+        ),
+    ] = None
+
+    enable_mem_efficient_sdp: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to enable memory efficient scaled dot product attention.",
+        ),
+    ] = None
+
+    enable_math_sdp: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to enable math scaled dot product attention.",
+        ),
+    ] = None
+
+    allow_tf32: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to allow TensorFloat32 (tf32) for cudnn and cuda matmul.",
+        ),
+    ] = None
+
+    benchmark: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to enable benchmark mode for cudnn.",
+        ),
+    ] = None
+
+    deterministic: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to enable deterministic mode for cudnn.",
+        ),
+    ] = None
+
+    def apply(self):
+        import torch.backends.cuda as backend_cuda
+        import torch.backends.cudnn as backend_cudnn
+        import torch.cuda as cuda
+
+        if self.per_process_vram_fraction is not None:
+            cuda.set_per_process_memory_fraction(self.per_process_vram_fraction)
+
+        if self.allow_fp16_reduced_precision_reduction is not None:
+            backend_cuda.matmul.allow_fp16_reduced_precision_reduction = (
+                self.allow_fp16_reduced_precision_reduction
+            )
+
+        if self.allow_bf16_reduced_precision_reduction is not None:
+            backend_cuda.matmul.allow_bf16_reduced_precision_reduction = (
+                self.allow_bf16_reduced_precision_reduction
+            )
+
+        if self.enable_flash_sdp is not None:
+            backend_cuda.enable_flash_sdp(self.enable_flash_sdp)
+
+        if self.enable_mem_efficient_sdp is not None:
+            backend_cuda.enable_mem_efficient_sdp(self.enable_mem_efficient_sdp)
+
+        if self.enable_math_sdp is not None:
+            backend_cuda.enable_math_sdp(self.enable_math_sdp)
+
+        if self.allow_tf32 is not None:
+            backend_cuda.matmul.allow_tf32 = self.allow_tf32
+            backend_cudnn.allow_tf32 = self.allow_tf32
+
+        if self.benchmark is not None:
+            backend_cudnn.benchmark = self.benchmark
+
+        if self.deterministic is not None:
+            backend_cudnn.deterministic = self.deterministic
+
+
+class GradioConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    launch: Annotated[
+        bool,
+        Field(
+            description="Whether to launch Gradio.",
+        ),
+    ] = False
+
+    share: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to share on Gradio.",
+        ),
+    ] = None
+
+    server_name: Annotated[
+        Optional[str],
+        Field(
+            description="Server name for Gradio.",
+            examples=["localhost", "0.0.0.0"],
+        ),
+    ] = None
+
+    server_port: Annotated[
+        Optional[int],
+        Field(
+            description="Server port for Gradio.",
+            examples=[7860],
+        ),
+    ] = None
 
 
 class RealtimeWhisperConfig(BaseSettings):
@@ -236,25 +440,19 @@ class RealtimeWhisperConfig(BaseSettings):
         env_file_encoding="utf-8",
     )
 
-    logging: LoggingConfig = LoggingConfig()  # type: ignore
-    websocket: Optional[WebsocketConfig] = None
-    whisper: WhisperModelConfig = WhisperModelConfig()  # type: ignore
-    generation: GenerationConfig = GenerationConfig()  # type: ignore
-    vad: VoiceActivityDetectionConfig = VoiceActivityDetectionConfig()  # type: ignore
+    logging: LoggingConfig = LoggingConfig()
+    whisper: WhisperModelConfig = WhisperModelConfig()
+    lid: LanguageIdentificationModelConfig = LanguageIdentificationModelConfig()
+    common: ModelLoadConfig = ModelLoadConfig()
+    generation: GenerationConfig = GenerationConfig()
+    vad: VoiceActivityDetectionConfig = VoiceActivityDetectionConfig()
+    backend: BackendConfig = BackendConfig()
+    websocket: WebsocketConfig = WebsocketConfig()
+    gradio: GradioConfig = GradioConfig()
 
-    output_format: OutputFormatEnum = Field(
-        OutputFormatEnum.transcript,
-        description="Output format.",
-    )
-
-    memory_summary: bool = Field(
-        False,
-        description="Whether to print memory summary after each inference.",
-    )
-
-    vram_fraction: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Fraction of GPU memory to allocate per process. If None, all available memory will be used.",
-    )
+    output_format: Annotated[
+        OutputFormatEnum,
+        Field(
+            description="Output format.",
+        ),
+    ] = OutputFormatEnum.transcript

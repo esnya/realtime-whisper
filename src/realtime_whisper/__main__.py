@@ -1,3 +1,5 @@
+import asyncio
+
 from .cli import cli
 
-cli()
+asyncio.run(cli())

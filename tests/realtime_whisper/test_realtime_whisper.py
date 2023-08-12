@@ -3,8 +3,10 @@ from pathlib import Path
 from unittest import IsolatedAsyncioTestCase
 
 import numpy as np
+
 from src.realtime_whisper.config import RealtimeWhisperConfig
-from src.realtime_whisper.realtime_whisper import RealtimeWhisper
+from src.realtime_whisper.loader import load_lid_models, load_whisper_models
+from src.realtime_whisper.realtime_whisper import RealtimeWhisper, TranscriptionResult
 
 
 class TestRealtimeWhisper(IsolatedAsyncioTestCase):
@@ -14,9 +16,11 @@ class TestRealtimeWhisper(IsolatedAsyncioTestCase):
                 "logging": {
                     "level": "WARNING",
                 },
+                "lid": {
+                    "model": "facebook/mms-lid-126",
+                },
                 "whisper": {
                     "model": "openai/whisper-tiny",
-                    "device": "cpu",
                 },
                 "vad": {
                     "min_duration": 0.1,
@@ -36,15 +40,25 @@ class TestRealtimeWhisper(IsolatedAsyncioTestCase):
         )
 
     def test_init(self):
-        realtime_whisper = RealtimeWhisper(self.config)
+        realtime_whisper = RealtimeWhisper(
+            self.config,
+            *load_lid_models(self.config.lid, self.config.common),
+            *load_whisper_models(self.config.whisper, self.config.common),
+        )
         self.assertIsInstance(realtime_whisper, RealtimeWhisper)
 
     async def test_transcribe(self):
-        realtime_whisper = RealtimeWhisper(self.config)
+        realtime_whisper = RealtimeWhisper(
+            self.config,
+            *load_lid_models(self.config.lid, self.config.common),
+            *load_whisper_models(self.config.whisper, self.config.common),
+        )
         self.assertIsInstance(realtime_whisper, RealtimeWhisper)
         realtime_whisper.write(self.audio_data)
-        text = await realtime_whisper.transcribe()
-        self.assertIsInstance(text, str)
+        result = await realtime_whisper.transcribe()
+        self.assertIsInstance(result, TranscriptionResult)
+        assert isinstance(result, TranscriptionResult)
+        text = result.transcription
 
         assert isinstance(text, str)
         self.assertEqual(

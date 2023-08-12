@@ -5,6 +5,7 @@ services:
     build: .
     ports:
       - 8760:8760
+      - 7860:7860
     deploy:
       resources:
         reservations:
