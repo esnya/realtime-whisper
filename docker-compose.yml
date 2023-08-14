@@ -2,7 +2,8 @@ version: "3.7"
 
 services:
   realtime-whisper:
-    build: .
+    build:
+      context: .
     ports:
       - 8760:8760
       - 7860:7860

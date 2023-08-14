@@ -1,0 +1,10 @@
+accelerate
+bitsandbytes
+gradio
+librosa
+optimum
+pycountry
+pydantic
+pydantic_settings
+transformers
+websockets
