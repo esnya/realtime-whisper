@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from functools import cached_property
+from time import time
 from typing import AsyncContextManager, AsyncIterator, Callable, Dict, Optional, Union
 
 import numpy as np
@@ -41,6 +42,8 @@ class TranscriptionResult(BaseModel):
     language_code: str
     language_score: float
     logprobs: TranscriptionLogprobs
+    start_timestamp: float
+    end_timestamp: float
 
 
 class RealtimeWhisper(AsyncContextManager):
@@ -66,6 +69,7 @@ class RealtimeWhisper(AsyncContextManager):
         self.whisper = whisper
         self.whisper_feature_extractor = whisper_feature_extractor
         self.whisper_tokenizer = whisper_tokenizer
+        self.start_timestamp = self.end_timestamp = time()
 
         self.audio_buffer = np.zeros((0,), dtype=np.float32)
 
@@ -93,12 +97,14 @@ class RealtimeWhisper(AsyncContextManager):
         self.audio_buffer = np.concatenate((self.audio_buffer, audio))[
             -self.config.vad.max_frames :
         ]
+        self.end_timestamp = time()
         self.is_dirty.set()
 
     def stop(self):
         self.stop_flag.set()
 
     def _clear_buffer(self):
+        self.start_timestamp = time()
         self.audio_buffer = self.audio_buffer[-self.stride_frames :]
 
     @cached_property
@@ -253,6 +259,8 @@ class RealtimeWhisper(AsyncContextManager):
                 eos=float(logprobs[3]),
                 non_speech=float(logprobs[4]),
             ),
+            start_timestamp=self.start_timestamp,
+            end_timestamp=self.end_timestamp,
         )
 
         logger.info(result)

@@ -1,6 +1,7 @@
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime as model_downloader
 RUN --mount=type=cache,target=/root/.cache/pip pip install transformers
 RUN --mount=type=cache,target=/root/.cache/huggingface python -c "import torch; from transformers import pipeline; pipeline('automatic-speech-recognition', 'openai/whisper-tiny', torch_dtype=torch.float16).save_pretrained('./models/whisper-tiny', safe_serialization=True)"
+RUN --mount=type=cache,target=/root/.cache/huggingface python -c "import torch; from transformers import pipeline; pipeline('automatic-speech-recognition', 'openai/whisper-small', torch_dtype=torch.float16).save_pretrained('./models/whisper-small', safe_serialization=True)"
 RUN --mount=type=cache,target=/root/.cache/huggingface python -c "import torch; from transformers import pipeline; pipeline('automatic-speech-recognition', 'openai/whisper-medium', torch_dtype=torch.float16).save_pretrained('./models/whisper-medium', safe_serialization=True)"
 RUN --mount=type=cache,target=/root/.cache/huggingface python -c "import torch; from transformers import pipeline; pipeline('automatic-speech-recognition', 'openai/whisper-large-v2', torch_dtype=torch.float16).save_pretrained('./models/whisper-large', safe_serialization=True)"
 RUN --mount=type=cache,target=/root/.cache/huggingface python -c "import torch; from transformers import pipeline; pipeline('audio-classification', 'facebook/mms-lid-4017', torch_dtype=torch.float16).save_pretrained('./models/mms-lid-4017', safe_serialization=True)"
@@ -22,7 +23,6 @@ RUN --mount=type=cache,target=/home/appuser/.cache/pip pip install \
     websockets
 COPY --from=model_downloader --chown=appuser:appuser /workspace/models/ /workspace/models/
 ADD --chown=appuser:appuser src/ /workspace/
-
 
 EXPOSE 8760
 EXPOSE 7860
