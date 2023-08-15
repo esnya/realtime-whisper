@@ -253,6 +253,13 @@ class VoiceActivityDetectionConfig(BaseModel):
         ),
     ] = re.compile(r"(おだしょー|おついち|ちょまど)(さん)?:")
 
+    suppress_tokens: Annotated[
+        List[str],
+        Field(
+            description="Tokens for suppression during generation.",
+        ),
+    ] = [":", "："]
+
     no_speech_pattern: Annotated[
         re.Pattern[str],
         Field(

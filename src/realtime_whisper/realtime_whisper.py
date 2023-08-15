@@ -73,6 +73,18 @@ class RealtimeWhisper(AsyncContextManager):
 
         self.audio_buffer = np.zeros((0,), dtype=np.float32)
 
+        suppress_tokens = [
+            self.whisper_tokenizer.encode(char, add_special_tokens=False)[0]
+            for char in config.vad.suppress_tokens
+        ]
+        if self.whisper.config.suppress_tokens is not None:
+            self.whisper.config.suppress_tokens.extend(suppress_tokens)
+        if (
+            self.whisper.generation_config
+            and self.whisper.generation_config.suppress_tokens is not None
+        ):
+            self.whisper.generation_config.suppress_tokens.extend(suppress_tokens)
+
         self.logprob_thresholds = torch.tensor(
             [
                 config.vad.min_logprob_threshold,
