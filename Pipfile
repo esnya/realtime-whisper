@@ -21,6 +21,8 @@ transformers = "*"
 websockets = "*"
 aiohttp = ">=3.8.5"
 certifi = ">=2023.07.22"
+pycountry = "*"
+librosa = "*"
 
 [dev-packages]
 bandit = "*"

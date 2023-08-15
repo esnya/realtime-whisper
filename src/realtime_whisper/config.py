@@ -415,11 +415,18 @@ class GradioConfig(BaseModel):
     ] = False
 
     share: Annotated[
-        Optional[bool],
+        bool,
         Field(
             description="Whether to share on Gradio.",
         ),
-    ] = None
+    ] = True
+
+    debug: Annotated[
+        bool,
+        Field(
+            description="Whether to enable debug mode for Gradio.",
+        ),
+    ] = False
 
     server_name: Annotated[
         Optional[str],
@@ -459,11 +466,11 @@ class GradioConfig(BaseModel):
     ] = None
 
     ssl_verify: Annotated[
-        Optional[bool],
+        bool,
         Field(
             description="Whether to verify SSL for Gradio.",
         ),
-    ] = None
+    ] = False
 
 
 class RealtimeWhisperConfig(BaseSettings):
