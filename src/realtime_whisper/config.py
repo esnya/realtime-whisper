@@ -437,6 +437,34 @@ class GradioConfig(BaseModel):
         ),
     ] = None
 
+    ssl_keyfile: Annotated[
+        Optional[str],
+        Field(
+            description="Path to SSL key for Gradio.",
+        ),
+    ] = None
+
+    ssl_certfile: Annotated[
+        Optional[str],
+        Field(
+            description="Path to SSL certificate for Gradio.",
+        ),
+    ] = None
+
+    ssl_keyfile_password: Annotated[
+        Optional[str],
+        Field(
+            description="Password for SSL key for Gradio.",
+        ),
+    ] = None
+
+    ssl_verify: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to verify SSL for Gradio.",
+        ),
+    ] = None
+
 
 class RealtimeWhisperConfig(BaseSettings):
     model_config = SettingsConfigDict(
