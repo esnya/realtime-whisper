@@ -253,6 +253,7 @@ class RealtimeWhisper(AsyncContextManager):
 
         is_final = is_valid and (is_eos or is_fullfilled)
 
+        start_timestamp = self.start_timestamp
         if is_final:
             self._clear_buffer()
 
@@ -271,7 +272,7 @@ class RealtimeWhisper(AsyncContextManager):
                 eos=float(logprobs[3]),
                 non_speech=float(logprobs[4]),
             ),
-            start_timestamp=self.start_timestamp,
+            start_timestamp=start_timestamp,
             end_timestamp=self.end_timestamp,
         )
 
