@@ -1,4 +1,4 @@
-from argparse import ArgumentParser, _ArgumentGroup
+from argparse import ArgumentParser, BooleanOptionalAction, _ArgumentGroup
 from enum import Enum
 from itertools import chain
 from typing import Any, Generic, Optional, TypeVar, Union, get_args, get_origin
@@ -100,7 +100,7 @@ class PydanticArgumentParser(ArgumentParser, Generic[T]):
                         help=description,
                         default=default,
                         dest=dest,
-                        action="store_true",
+                        action=BooleanOptionalAction,
                     )
                 else:
                     (group or self).add_argument(
