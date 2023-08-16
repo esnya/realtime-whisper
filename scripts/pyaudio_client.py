@@ -12,7 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def pyaudio_client(url: str = "ws://localhost:8760", retry: Optional[int] = None, buffer_size: int=4096, input_device_index: Optional[int]=None):
+async def pyaudio_client(
+    url: str = "ws://localhost:8760",
+    retry: Optional[int] = None,
+    buffer_size: int = 4096,
+    input_device_index: Optional[int] = None,
+):
     try:
         logger.info(f"Connecting to {url}...")
         async with connect(url) as websocket:
@@ -83,8 +88,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--url", "-u", type=str, default="ws://localhost:8760")
     parser.add_argument("--retry", "-r", type=int)
-    parser.add_argument("--input-device-index", "-i", "-d" type=int)
-    parser.add_argument("--bufer-size", "-b", type=int, default=4096)
+    parser.add_argument("--input-device-index", "-i", "-d", type=int)
+    parser.add_argument("--buffer-size", "-b", type=int, default=4096)
     args = parser.parse_args()
 
     asyncio.run(pyaudio_client(**args.__dict__))
