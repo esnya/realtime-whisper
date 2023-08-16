@@ -197,7 +197,7 @@ class VoiceActivityDetectionConfig(BaseModel):
             ge=0.0,
             description="Language identification score threshold for voice termination detection. Greater value means more strict detection.",  # noqa
         ),
-    ] = 0.4
+    ] = 0.5
 
     min_logprob_threshold: Annotated[
         float,
@@ -237,14 +237,14 @@ class VoiceActivityDetectionConfig(BaseModel):
             le=0.0,
             description="Log probability threshold for non speech. Smaller value means more strict detection.",
         ),
-    ] = 0
+    ] = -0.1
 
     blacklist: Annotated[
         List[str],
         Field(
             description="Blacklist for transcripts. If transcript is in blacklist, it will be ignored.",
         ),
-    ] = ["ご視聴ありがとうございました。", "ご視聴ありがとうございました", "サブタイトル:ひかり"]
+    ] = ["ご視聴ありがとうございました。", "ご視聴ありがとうございました", "サブタイトル:ひかり", ""]
 
     cleaning_pattern: Annotated[
         re.Pattern[str],
@@ -265,7 +265,7 @@ class VoiceActivityDetectionConfig(BaseModel):
         Field(
             description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
         ),
-    ] = re.compile(r"^[([（【♪-]")
+    ] = re.compile(r"^[([（【♪-]|^ ([Yy]ou|[bBut])$")
 
     sleep_duration: Annotated[
         float,
