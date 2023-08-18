@@ -146,7 +146,7 @@ class TranscriptionConfig(BaseModel):
         Field(
             description="Pattern for no speech detection. If transcript matches this pattern, it will be ignored.",
         ),
-    ] = re.compile(r"^[([（【♪- ]")
+    ] = re.compile(r"^[([（【♪\- ]")
 
     sleep_duration: Annotated[
         float,
