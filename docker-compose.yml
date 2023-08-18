@@ -1,5 +1,9 @@
 version: "3.7"
 
+volumes:
+  model-cache: {}
+
+
 services:
   realtime-whisper:
     build:
@@ -7,6 +11,8 @@ services:
     ports:
       - 8760:8760
       - 7860:7860
+    volumes:
+      - model-cache:/root/.cache/huggingface
     deploy:
       resources:
         reservations:

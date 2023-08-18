@@ -1,23 +1,22 @@
-ARG whisper_size=medium
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime as model_downloader
-RUN --mount=type=cache,target=/root/.cache/pip pip install transformers
-RUN --mount=type=cache,target=/root/.cache/huggingface python -c "import torch; from transformers import pipeline; pipeline('audio-classification', 'facebook/mms-lid-4017', torch_dtype=torch.float16).save_pretrained('./models/mms-lid-4017', safe_serialization=True)"
+ADD requirements.txt /workspace/requirements.txt
+RUN --mount=type=cache,target=/workspace/.cache/pip pip install -r requirements.txt
+ADD ./src/realtime_whisper/ /workspace/realtime_whisper/
 
-FROM esnya/transformers-whisper:$whisper_size-fp16
-ARG whisper_size=medium
+ENV CONFIG_LOGGING__LEVEL=INFO
 
-RUN groupadd -g 1000 app && \
-    useradd -r -m -u 1000 -g app app
-RUN chown -R app:app /workspace
-USER app:app
-ADD --chown=app:app requirements.txt /workspace/requirements.txt
-RUN --mount=type=cache,target=/home/app/.cache/pip pip install -r requirements.txt
-COPY --from=model_downloader --chown=app:app /workspace/models/ /workspace/models/
-ADD --chown=app:app src/realtime_whisper/ /workspace/realtime_whisper/
-RUN ln -s /workspace/models/whisper-$whisper_size-float16/ /workspace/models/whisper
+ENV CONFIG_COMMON__DEVICE_MAP=cuda
+ENV CONFIG_COMMON__TORCH_DTYPE=float16
 
+ENV CONFIG_WEBSOCKET__SERVE=True
+ENV CONFIG_WEBSOCKET__HOST=0.0.0.0
+ENV CONFIG_WEBSOCKET__PORT=8760
 EXPOSE 8760
+
+ENV CONFIG_GRADIO__LAUNCH=True
+ENV CONFIG_GRADIO__SERVER_NAME=0.0.0.0
+ENV CONFIG_GRADIO__SERVER_PORT=7860
 EXPOSE 7860
 
-ENTRYPOINT ["python", "-m", "realtime_whisper", "--logging-level", "INFO", "--websocket-serve", "--websocket-host=0.0.0.0", "--websocket-port=8760", "--gradio-launch", "--gradio-server-name=0.0.0.0", "--gradio-server-port=7860", "--output-format=json", "--whisper-model=./models/whisper", "--lid-model=./models/mms-lid-4017", "--common-device-map=cuda", "--common-torch-dtype=float16"]
+ENTRYPOINT ["python", "-m", "realtime_whisper"]
