@@ -1,11 +1,13 @@
 from argparse import ArgumentParser, BooleanOptionalAction, _ArgumentGroup
 from enum import Enum
+from functools import cache
 from itertools import chain
-from typing import Any, Generic, Optional, TypeVar, Union, get_args, get_origin
+from typing import Any, Dict, Generic, Optional, TypeVar, Union, get_args, get_origin
 
 import torch
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
+from pydantic_settings import PydanticBaseSettingsSource
 
 
 def convert_to_cli_type(t: type) -> type:
@@ -129,3 +131,25 @@ class PydanticArgumentParser(ArgumentParser, Generic[T]):
         args = self._build_nested_dict(self.parse_args(args).__dict__)
 
         return self.model.model_validate(args)
+
+
+class ArgumentParserBaseSettingsSource(PydanticBaseSettingsSource):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.parser = PydanticArgumentParser(self.settings_cls)
+
+    @cache
+    def get_nested_dict(self) -> Dict[str, Any]:
+        return self.parser._build_nested_dict(self.parser.parse_args().__dict__)
+
+    def get_field_value(
+        self, field: FieldInfo, field_name: str
+    ) -> tuple[Any, str, bool]:
+        return self.get_nested_dict()[field_name], field_name, False
+
+    def field_is_complex(self, field: FieldInfo) -> bool:
+        return False
+
+    def __call__(self):
+        return self.get_nested_dict()

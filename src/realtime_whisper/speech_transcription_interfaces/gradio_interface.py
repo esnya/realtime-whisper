@@ -6,14 +6,14 @@ import gradio as gr
 import librosa
 import numpy as np
 
-from .app_io import AppIoBase
-from .config import GradioConfig
-from .realtime_whisper import TranscriptionResult
+from ..config.gradio_config import GradioConfig
+from ..realtime_whisper import TranscriptionResult
+from . import SpeechTranscriptionInterface
 
 logger = logging.getLogger(__name__)
 
 
-class GradioApp(AppIoBase):
+class GradioInterface(SpeechTranscriptionInterface):
     def __init__(self, config: GradioConfig, sampling_rate: int):
         self.config = config
         self.sampling_rate = sampling_rate
@@ -122,13 +122,15 @@ class GradioApp(AppIoBase):
 
 
 if __name__ == "__main__":
-    from .config import RealtimeWhisperConfig
+    from ..config import RealtimeWhisperConfig
 
     config = RealtimeWhisperConfig()
     logging.basicConfig(**config.logging.model_dump(exclude_none=True))
 
     async def main():
-        async with GradioApp(config.gradio, config.vad.sampling_rate) as app:
+        async with GradioInterface(
+            config.gradio, config.transcription.sampling_rate
+        ) as app:
             app.blocks.queue().launch(
                 **config.gradio.model_dump(exclude_none=True, exclude=set(("launch",)))
             )

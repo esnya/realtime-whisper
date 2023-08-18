@@ -8,13 +8,13 @@ from websockets.server import WebSocketServerProtocol, serve
 
 from realtime_whisper.realtime_whisper import TranscriptionResult
 
-from .app_io import AppIoBase
-from .config import WebsocketConfig
+from ..config.websocket_config import WebsocketConfig
+from . import SpeechTranscriptionInterface
 
 logger = logging.getLogger(__name__)
 
 
-class WebsocketServerIO(AppIoBase):
+class WebsocketServerInterface(SpeechTranscriptionInterface):
     def __init__(self, config: WebsocketConfig, sampling_rate: int):
         self.config = config
         self.sampling_rate = sampling_rate

@@ -18,7 +18,6 @@ from transformers import (
     WhisperTokenizerFast,
 )
 from transformers.models.whisper.configuration_whisper import NON_SPEECH_TOKENS_MULTI
-from transformers.models.whisper.tokenization_whisper import LANGUAGES
 
 from .config import RealtimeWhisperConfig
 
@@ -62,8 +61,8 @@ class RealtimeWhisper(AsyncContextManager):
         self.forced_message = None
         self.stop_flag = asyncio.Event()
         self.is_dirty = asyncio.Event()
-        self.no_speech_pattern = re.compile(config.vad.no_speech_pattern)
-        self.stride_frames = config.vad.stride_frames
+        self.no_speech_pattern = re.compile(config.transcription.no_speech_pattern)
+        self.stride_frames = config.transcription.stride_frames
         self.lid_model = lid_model
         self.lid_feature_extractor = lid_feature_extractor
         self.whisper = whisper
@@ -75,7 +74,7 @@ class RealtimeWhisper(AsyncContextManager):
 
         suppress_tokens = [
             self.whisper_tokenizer.encode(char, add_special_tokens=False)[0]
-            for char in config.vad.suppress_tokens
+            for char in config.transcription.suppress_tokens
         ]
         if self.whisper.config.suppress_tokens is not None:
             self.whisper.config.suppress_tokens.extend(suppress_tokens)
@@ -87,11 +86,11 @@ class RealtimeWhisper(AsyncContextManager):
 
         self.logprob_thresholds = torch.tensor(
             [
-                config.vad.min_logprob_threshold,
-                config.vad.sum_logprob_threshold,
-                config.vad.mean_logprob_threshold,
-                config.vad.eos_logprob_threshold,
-                -config.vad.non_speech_logprob_threshold,
+                config.transcription.min_logprob_threshold,
+                config.transcription.sum_logprob_threshold,
+                config.transcription.mean_logprob_threshold,
+                config.transcription.eos_logprob_threshold,
+                -config.transcription.non_speech_logprob_threshold,
             ],
             device=self.whisper.device,
             dtype=self.whisper.dtype,
@@ -107,7 +106,7 @@ class RealtimeWhisper(AsyncContextManager):
 
     def write(self, audio: np.ndarray):
         self.audio_buffer = np.concatenate((self.audio_buffer, audio))[
-            -self.config.vad.max_frames :
+            -self.config.transcription.max_frames :
         ]
         self.end_timestamp = time()
         self.is_dirty.set()
@@ -153,17 +152,17 @@ class RealtimeWhisper(AsyncContextManager):
 
         logger.debug("Transcribing %s frames", self.audio_buffer.size)
 
-        if self.audio_buffer.size < self.config.vad.min_frames:
+        if self.audio_buffer.size < self.config.transcription.min_frames:
             logger.debug(
                 "Not enough frames (%s < %s)",
                 self.audio_buffer.size,
-                self.config.vad.min_frames,
+                self.config.transcription.min_frames,
             )
-            await asyncio.sleep(self.config.vad.min_duration)
+            await asyncio.sleep(self.config.transcription.min_duration)
             return None
 
         max_new_tokens = int(
-            self.config.vad.max_tokens_per_frame * self.audio_buffer.size
+            self.config.transcription.max_tokens_per_frame * self.audio_buffer.size
         )
         max_volume = np.max(self.audio_buffer)
 
@@ -174,7 +173,7 @@ class RealtimeWhisper(AsyncContextManager):
 
         input_features = self.lid_feature_extractor(
             self.audio_buffer,
-            sampling_rate=self.config.vad.sampling_rate,
+            sampling_rate=self.config.transcription.sampling_rate,
             return_tensors="pt",
         )["input_values"].to(**self.lid_to_kwargs)
 
@@ -187,18 +186,18 @@ class RealtimeWhisper(AsyncContextManager):
         score = float(top.values[0])
         language = int(top.indices[0])
 
-        if score < self.config.vad.lid_score_threshold:
+        if score < self.config.transcription.lid_score_threshold:
             logger.debug("Low LID score: %s", score)
             return None
 
         language = self.get_language(int(language))
-        if language is None or language not in LANGUAGES:
+        if language is None or language not in self.config.transcription.languages:
             logger.debug("Unsupported language: %s", language)
             return None
 
         input_features = self.whisper_feature_extractor(
             self.audio_buffer,
-            sampling_rate=self.config.vad.sampling_rate,
+            sampling_rate=self.config.transcription.sampling_rate,
             return_tensors="pt",
         )["input_features"].to(self.whisper.device, self.whisper.dtype)
 
@@ -218,7 +217,9 @@ class RealtimeWhisper(AsyncContextManager):
         logprobs = torch.stack(scores)[:, 0, :].log_softmax(-1)
         non_speech_logprobs = logprobs[:, NON_SPEECH_TOKENS_MULTI].max()
 
-        is_fullfilled = self.audio_buffer.shape[-1] >= self.config.vad.max_frames
+        is_fullfilled = (
+            self.audio_buffer.shape[-1] >= self.config.transcription.max_frames
+        )
 
         output_sequence = model_outputs.sequences[0]
 
@@ -239,7 +240,9 @@ class RealtimeWhisper(AsyncContextManager):
         transcription: str = self.whisper_tokenizer.decode(
             output_sequence, skip_special_tokens=True
         )
-        transcription = self.config.vad.cleaning_pattern.sub("", transcription)
+        transcription = self.config.transcription.cleaning_pattern.sub(
+            "", transcription
+        )
 
         if is_fullfilled:
             logprobs[3] = torch.inf

@@ -1,27 +1,30 @@
 import asyncio
+from abc import abstractmethod
 from typing import Any, AsyncContextManager, AsyncIterable, AsyncIterator, Union
 
 import numpy as np
 
 from realtime_whisper.realtime_whisper import TranscriptionResult
 
-from .async_itertools import amerge
+from ..utils.async_itertools import amerge
 
 
-class AppIoBase(AsyncIterable[np.ndarray], AsyncContextManager):
-    def write(self, transcription: Union[str, TranscriptionResult]):
-        raise NotImplementedError()
+class SpeechTranscriptionInterface(AsyncIterable[np.ndarray], AsyncContextManager):
+    @abstractmethod
+    async def write(self, transcription: Union[str, TranscriptionResult]):
+        ...
 
-    async def __aenter__(self) -> "AppIoBase":
+    async def __aenter__(self) -> "SpeechTranscriptionInterface":
         return self
 
+    @abstractmethod
     async def __aiter__(self) -> AsyncIterator[np.ndarray]:
-        raise NotImplementedError()
-        yield np.ndarray(0)
+        ...
+        yield np.array([])
 
 
-class App(AppIoBase):
-    def __init__(self, *apps: AppIoBase):
+class AggregatedInterface(SpeechTranscriptionInterface):
+    def __init__(self, *apps: SpeechTranscriptionInterface):
         self.apps = apps
 
     async def write(self, transcription: Union[str, TranscriptionResult]):
@@ -31,7 +34,7 @@ class App(AppIoBase):
         async for audio in amerge(*self.apps):
             yield audio
 
-    async def __aenter__(self) -> "App":
+    async def __aenter__(self) -> "AggregatedInterface":
         await asyncio.gather(*(app.__aenter__() for app in self.apps))
         return self
 

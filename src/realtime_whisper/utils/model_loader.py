@@ -5,6 +5,7 @@ from transformers import (
     AutoFeatureExtractor,
     AutoModelForAudioClassification,
     BatchFeature,
+    GenerationConfig,
     PreTrainedModel,
     WhisperFeatureExtractor,
     WhisperForConditionalGeneration,
@@ -12,7 +13,7 @@ from transformers import (
 )
 from transformers.models.auto.auto_factory import _BaseAutoModelClass
 
-from .config import (
+from ..config.model_config import (
     LanguageIdentificationModelConfig,
     ModelLoadConfig,
     WhisperModelConfig,
@@ -37,10 +38,12 @@ def load_models(
         **config.model_dump(exclude_none=True, exclude=exclude),
     }
 
+    generation_config_name = kwargs.pop("generation_config", None)
+
     if config.quantization_config:
-        kwargs["quantization_config"] = config.quantization_config
+        kwargs["quantization_config"] = config.quantization_config.as_bnb_config
     if common_config.quantization_config:
-        kwargs["quantization_config"] = common_config.quantization_config
+        kwargs["quantization_config"] = common_config.quantization_config.as_bnb_config
 
     logger.info("Loading model %s", name_or_path)
     model = (auto_cls or model_cls).from_pretrained(name_or_path, **kwargs)
@@ -53,6 +56,11 @@ def load_models(
         model.device,
         model.dtype,
     )
+
+    if generation_config_name:
+        model.generation_config = GenerationConfig.from_pretrained(
+            generation_config_name
+        )
 
     logger.info("Loading feature extractor")
     feature_extractor = AutoFeatureExtractor.from_pretrained(model.name_or_path)

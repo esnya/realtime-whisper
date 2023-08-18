@@ -5,8 +5,8 @@ from unittest import IsolatedAsyncioTestCase
 import numpy as np
 
 from src.realtime_whisper.config import RealtimeWhisperConfig
-from src.realtime_whisper.loader import load_lid_models, load_whisper_models
 from src.realtime_whisper.realtime_whisper import RealtimeWhisper, TranscriptionResult
+from src.realtime_whisper.utils.model_loader import load_lid_models, load_whisper_models
 
 
 class TestRealtimeWhisper(IsolatedAsyncioTestCase):
