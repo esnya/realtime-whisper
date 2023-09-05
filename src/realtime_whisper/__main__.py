@@ -80,7 +80,7 @@ async def cli():
 
                 await interface.write(result)
 
-        await asyncio.gather(raeder(), writer())
+        await asyncio.gather(raeder(), writer(), return_exceptions=True)
 
 
 try:

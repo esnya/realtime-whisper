@@ -19,7 +19,7 @@ class GradioConfig(BaseModel):
         Field(
             description="Whether to share on Gradio.",
         ),
-    ] = True
+    ] = False
 
     debug: Annotated[
         bool,

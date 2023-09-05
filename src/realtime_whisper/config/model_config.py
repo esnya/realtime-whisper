@@ -33,6 +33,20 @@ class ModelLoadConfig(BaseModel):
         ),
     ] = None
 
+    load_in_4bit: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to load model in 4-bit.",
+        ),
+    ] = None
+
+    load_in_8bit: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to load model in 8-bit.",
+        ),
+    ] = None
+
 
 class WhisperModelConfig(ModelLoadConfig, BaseModel):
     model: Annotated[

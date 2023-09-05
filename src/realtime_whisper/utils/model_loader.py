@@ -45,6 +45,9 @@ def load_models(
     if common_config.quantization_config:
         kwargs["quantization_config"] = common_config.quantization_config.as_bnb_config
 
+    if "quantization_config" in kwargs:
+        logger.info("Quantization config: %s", kwargs["quantization_config"])
+
     logger.info("Loading model %s", name_or_path)
     model = (auto_cls or model_cls).from_pretrained(name_or_path, **kwargs)
     assert isinstance(model, model_cls)
