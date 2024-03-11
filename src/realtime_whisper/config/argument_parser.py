@@ -27,12 +27,6 @@ def get_nested_types(annotation: type) -> list[type[BaseModel]]:
         assert issubclass(annotation, BaseModel)
         return [annotation]
 
-    # # if annotation.__name__ == "Annotated":
-    # if hasattr(annotation, "__bases__"):
-    #     print(
-    #         annotation, issubclass(BaseModel, annotation)
-    #     )  # , get_nested_types(get_args(annotation)[0]))
-
     if get_origin(annotation) is Union:
         return list(
             chain.from_iterable([get_nested_types(t) for t in get_args(annotation)])

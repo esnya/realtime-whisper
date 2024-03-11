@@ -17,6 +17,7 @@ async def pyaudio_client(
     retry: Optional[int] = None,
     buffer_size: int = 4096,
     input_device_index: Optional[int] = None,
+    **kwargs,
 ):
     try:
         logger.info(f"Connecting to {url}...")
@@ -79,7 +80,7 @@ async def pyaudio_client(
         if retry is not None:
             logger.info(f"Retrying in {retry} seconds...")
             await asyncio.sleep(retry)
-            await pyaudio_client(url, retry)
+            await pyaudio_client(url, retry, buffer_size, input_device_index)
 
 
 if __name__ == "__main__":
@@ -90,6 +91,16 @@ if __name__ == "__main__":
     parser.add_argument("--retry", "-r", type=int)
     parser.add_argument("--input-device-index", "-i", "-d", type=int)
     parser.add_argument("--buffer-size", "-b", type=int, default=4096)
+    parser.add_argument("--list-devices", "-l", action="store_true", default=False)
     args = parser.parse_args()
+
+    if args.list_devices:
+        pa = pyaudio.PyAudio()
+        for i in range(pa.get_device_count()):
+            info = pa.get_device_info_by_index(i)
+            if info["maxInputChannels"] == 0:
+                continue
+            print(info["index"], info["name"])
+        exit()
 
     asyncio.run(pyaudio_client(**args.__dict__))

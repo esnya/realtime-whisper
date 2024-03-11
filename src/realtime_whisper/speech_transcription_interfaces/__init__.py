@@ -4,15 +4,13 @@ from typing import Any, AsyncContextManager, AsyncIterable, AsyncIterator, Union
 
 import numpy as np
 
-from realtime_whisper.realtime_whisper import TranscriptionResult
-
+from ..realtime_whisper import TranscriptionResult
 from ..utils.async_itertools import amerge
 
 
 class SpeechTranscriptionInterface(AsyncIterable[np.ndarray], AsyncContextManager):
     @abstractmethod
-    async def write(self, transcription: Union[str, TranscriptionResult]):
-        ...
+    async def write(self, transcription: Union[str, TranscriptionResult]): ...
 
     async def __aenter__(self) -> "SpeechTranscriptionInterface":
         return self

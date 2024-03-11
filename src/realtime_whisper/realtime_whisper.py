@@ -1,23 +1,18 @@
 import asyncio
 import logging
 import re
-from functools import cached_property
 from time import time
-from typing import AsyncContextManager, AsyncIterator, Callable, Dict, Optional, Union
+from typing import AsyncContextManager, AsyncIterator, Optional, Union
 
 import numpy as np
 import torch
-from pycountry import languages
 from pydantic import BaseModel
 from transformers import (
-    BatchFeature,
-    PreTrainedModel,
     WhisperFeatureExtractor,
     WhisperForConditionalGeneration,
     WhisperTokenizer,
     WhisperTokenizerFast,
 )
-from transformers.models.whisper.configuration_whisper import NON_SPEECH_TOKENS_MULTI
 
 from .config import RealtimeWhisperConfig
 
@@ -49,8 +44,6 @@ class RealtimeWhisper(AsyncContextManager):
     def __init__(
         self,
         config: RealtimeWhisperConfig,
-        lid_model: PreTrainedModel,
-        lid_feature_extractor: Callable[..., BatchFeature],
         whisper: WhisperForConditionalGeneration,
         whisper_feature_extractor: WhisperFeatureExtractor,
         whisper_tokenizer: Union[WhisperTokenizer, WhisperTokenizerFast],
@@ -63,8 +56,6 @@ class RealtimeWhisper(AsyncContextManager):
         self.is_dirty = asyncio.Event()
         self.no_speech_pattern = re.compile(config.transcription.no_speech_pattern)
         self.stride_frames = config.transcription.stride_frames
-        self.lid_model = lid_model
-        self.lid_feature_extractor = lid_feature_extractor
         self.whisper = whisper
         self.whisper_feature_extractor = whisper_feature_extractor
         self.whisper_tokenizer = whisper_tokenizer
@@ -72,17 +63,10 @@ class RealtimeWhisper(AsyncContextManager):
 
         self.audio_buffer = np.zeros((0,), dtype=np.float32)
 
-        suppress_tokens = [
-            self.whisper_tokenizer.encode(char, add_special_tokens=False)[0]
-            for char in config.transcription.suppress_tokens
-        ]
-        if self.whisper.config.suppress_tokens is not None:
-            self.whisper.config.suppress_tokens.extend(suppress_tokens)
-        if (
-            self.whisper.generation_config
-            and self.whisper.generation_config.suppress_tokens is not None
-        ):
-            self.whisper.generation_config.suppress_tokens.extend(suppress_tokens)
+        generation_config = whisper.generation_config
+        assert generation_config is not None
+
+        self.generation_config = generation_config
 
         self.logprob_thresholds = torch.tensor(
             [
@@ -90,11 +74,26 @@ class RealtimeWhisper(AsyncContextManager):
                 config.transcription.sum_logprob_threshold,
                 config.transcription.mean_logprob_threshold,
                 config.transcription.eos_logprob_threshold,
-                -config.transcription.non_speech_logprob_threshold,
             ],
             device=self.whisper.device,
             dtype=self.whisper.dtype,
         )
+
+        self.language_ids = torch.tensor(
+            list(generation_config.lang_to_id.values()),  # type: ignore
+            device=self.whisper.device,
+            dtype=torch.long,
+        )
+
+        self.language_detection_input_ids = torch.tensor(
+            ((generation_config.decoder_start_token_id,),),
+            device=self.whisper.device,
+            dtype=torch.long,
+        )
+
+        self.id_to_lang = {
+            id: lang[2:-2] for lang, id in generation_config.lang_to_id.items()  # type: ignore
+        }
 
         logger.info("RealtimeWhisper initialized")
 
@@ -118,32 +117,8 @@ class RealtimeWhisper(AsyncContextManager):
         self.start_timestamp = time()
         self.audio_buffer = self.audio_buffer[-self.stride_frames :]
 
-    @cached_property
-    def lang_id2label(self) -> Dict[int, str]:
-        id2label = self.lid_model.config.id2label
-        assert isinstance(id2label, dict)
-        return id2label
-
-    @cached_property
-    def lid_to_kwargs(self) -> dict:
-        res = {}
-        if self.config.common.torch_dtype:
-            res["dtype"] = self.config.common.torch_dtype
-        if self.config.common.device_map:
-            res["device"] = self.config.common.device_map
-        if self.config.lid.torch_dtype:
-            res["device"] = self.config.common.torch_dtype
-        if self.config.lid.device_map:
-            res["device"] = self.config.common.device_map
-        return res
-
     def get_language(self, id: int) -> Optional[str]:
-        language = self.lang_id2label.get(id, None)
-        language = languages.get(alpha_3=language)
-        language = (
-            language.alpha_2 if hasattr(language, "alpha_2") else language.alpha_3
-        )
-        return language
+        return self.id_to_lang.get(id)
 
     @torch.inference_mode()
     async def transcribe(self) -> Optional[TranscriptionResult]:
@@ -171,35 +146,43 @@ class RealtimeWhisper(AsyncContextManager):
             self._clear_buffer()
             return None
 
-        input_features = self.lid_feature_extractor(
-            self.audio_buffer,
-            sampling_rate=self.config.transcription.sampling_rate,
-            return_tensors="pt",
-        )["input_values"].to(**self.lid_to_kwargs)
-
-        model_outputs = await asyncio.to_thread(
-            self.lid_model,
-            input_features,
-        )
-
-        top = model_outputs.logits[0].softmax(-1).topk(1)
-        score = float(top.values[0])
-        language = int(top.indices[0])
-
-        if score < self.config.transcription.lid_score_threshold:
-            logger.debug("Low LID score: %s", score)
-            return None
-
-        language = self.get_language(int(language))
-        if language is None or language not in self.config.transcription.languages:
-            logger.debug("Unsupported language: %s", language)
-            return None
-
+        logger.debug("Extracting features")
         input_features = self.whisper_feature_extractor(
             self.audio_buffer,
             sampling_rate=self.config.transcription.sampling_rate,
             return_tensors="pt",
         )["input_features"].to(self.whisper.device, self.whisper.dtype)
+
+        logger.debug("Detecting language")
+        test_outputs = self.whisper(
+            input_features, decoder_input_ids=self.language_detection_input_ids
+        )
+        assert isinstance(test_outputs.logits, torch.Tensor)
+
+        logprobs = test_outputs.logits[0, 0].log_softmax(-1)
+
+        non_speech_score = logprobs[50363].item()
+        if non_speech_score > self.config.transcription.non_speech_logprob_threshold:
+            logger.debug("Non speech detected: %s", non_speech_score)
+            self._clear_buffer()
+            return None
+
+        top = logprobs.index_select(-1, self.language_ids).topk(1)
+        language_id = int(self.language_ids[int(top.indices.item())].item())
+        language_code = self.get_language(language_id)
+        language_score = top.values.item()
+
+        logger.debug("Language: %s (%.2f)", language_code, language_score)
+        if language_score < self.config.transcription.language_score_threshold:
+            logger.debug("Low LID score: %.2f", language_score)
+            return None
+
+        if (
+            language_code is None
+            or language_code not in self.config.transcription.languages
+        ):
+            logger.debug("Unsupported language: %s", language_code)
+            return None
 
         model_outputs = await asyncio.to_thread(
             self.whisper.generate,
@@ -209,19 +192,18 @@ class RealtimeWhisper(AsyncContextManager):
             return_dict_in_generate=True,
             output_scores=True,
         )
-        assert not isinstance(model_outputs, torch.LongTensor)
+        assert isinstance(model_outputs, dict)
 
-        scores = model_outputs.scores
+        scores = model_outputs["scores"]
         assert scores is not None
 
         logprobs = torch.stack(scores)[:, 0, :].log_softmax(-1)
-        non_speech_logprobs = logprobs[:, NON_SPEECH_TOKENS_MULTI].max()
 
         is_fullfilled = (
             self.audio_buffer.shape[-1] >= self.config.transcription.max_frames
         )
 
-        output_sequence = model_outputs.sequences[0]
+        output_sequence = model_outputs["sequences"][0]
 
         logprobs = logprobs.max(-1).values
 
@@ -231,7 +213,6 @@ class RealtimeWhisper(AsyncContextManager):
                 logprobs.sum(),
                 logprobs.mean(),
                 logprobs[-1],
-                -non_speech_logprobs,
             ],
             device=self.whisper.device,
             dtype=self.whisper.dtype,
@@ -248,7 +229,7 @@ class RealtimeWhisper(AsyncContextManager):
             logprobs[3] = torch.inf
 
         is_valid = bool(torch.all(logprobs > self.logprob_thresholds))
-        logprobs[-1] *= -1
+        # logprobs[-1] *= -1
 
         is_eos = is_valid and bool(
             output_sequence[-1] == self.whisper_tokenizer.eos_token_id
@@ -262,8 +243,8 @@ class RealtimeWhisper(AsyncContextManager):
 
         result = TranscriptionResult(
             transcription=transcription,
-            language_code=language,
-            language_score=score,
+            language_code=language_code,
+            language_score=language_score,
             is_final=is_final,
             is_valid=is_valid,
             is_eos=is_eos,
@@ -273,7 +254,7 @@ class RealtimeWhisper(AsyncContextManager):
                 sum=float(logprobs[1]),
                 mean=float(logprobs[2]),
                 eos=float(logprobs[3]),
-                non_speech=float(logprobs[4]),
+                non_speech=non_speech_score,
             ),
             start_timestamp=start_timestamp,
             end_timestamp=self.end_timestamp,
@@ -290,8 +271,13 @@ class RealtimeWhisper(AsyncContextManager):
     async def __aiter__(self) -> AsyncIterator[TranscriptionResult]:
         logger.info("Streaming realtime transcription")
         while not self.stop_flag.is_set():
-            transcription = await self.transcribe()
-            torch.cuda.empty_cache()
-            if transcription is not None:
-                yield transcription
+            try:
+                transcription = await self.transcribe()
+                torch.cuda.empty_cache()
+                if transcription is not None:
+                    yield transcription
+            except Exception as e:
+                logger.exception(e)
+                continue
+
         logger.info("Streaming stopped")

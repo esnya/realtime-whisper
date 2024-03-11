@@ -1,8 +1,8 @@
 import re
+from enum import Enum
 from typing import List
 
 from pydantic import BaseModel, Field
-from pyparsing import Enum
 from transformers.models.whisper.tokenization_whisper import LANGUAGES
 from typing_extensions import Annotated
 
@@ -59,19 +59,19 @@ class TranscriptionConfig(BaseModel):
             gt=0.0,
             description="Stride duration in seconds for voice termination detection.",
         ),
-    ] = 0.8
+    ] = 1.0
 
     @property
     def stride_frames(self) -> int:
         return int(self.stride * self.sampling_rate)
 
-    lid_score_threshold: Annotated[
+    language_score_threshold: Annotated[
         float,
         Field(
-            ge=0.0,
+            le=0.0,
             description="Language identification score threshold for voice termination detection. Greater value means more strict detection.",  # noqa
         ),
-    ] = 0.5
+    ] = -0.5
 
     languages: Annotated[
         List[str],
@@ -125,14 +125,14 @@ class TranscriptionConfig(BaseModel):
         Field(
             description="Blacklist for transcripts. If transcript is in blacklist, it will be ignored.",
         ),
-    ] = ["ご視聴ありがとうございました。", "ご視聴ありがとうございました", "サブタイトル:ひかり", ""]
+    ] = []
 
     cleaning_pattern: Annotated[
         re.Pattern[str],
         Field(
             description="Pattern for removed from transcripts.",
         ),
-    ] = re.compile(r"(おだしょー|おついち|ちょまど)(さん)?:")
+    ] = re.compile(r"^$")
 
     suppress_tokens: Annotated[
         List[str],

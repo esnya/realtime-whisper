@@ -2,10 +2,10 @@ from enum import Enum
 from typing import Dict, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field
+from transformers import BitsAndBytesConfig
 from typing_extensions import Annotated
 
-from .quantization_config import QuantizationConfig
-from .utils import TorchDTypeOrAuto
+from .utils import TorchDType, TorchDTypeOrAuto
 
 
 class ModelLoadConfig(BaseModel):
@@ -26,13 +26,6 @@ class ModelLoadConfig(BaseModel):
         ),
     ] = None
 
-    quantization_config: Annotated[
-        Optional[QuantizationConfig],
-        Field(
-            description="Quantization config for model.",
-        ),
-    ] = None
-
     load_in_4bit: Annotated[
         Optional[bool],
         Field(
@@ -46,6 +39,58 @@ class ModelLoadConfig(BaseModel):
             description="Whether to load model in 8-bit.",
         ),
     ] = None
+
+    bnb_4bit_compute_dtype: Annotated[
+        Optional[TorchDType],
+        Field(
+            description="Torch dtype for 4-bit compute.",
+        ),
+    ] = None
+
+    bnb_8bit_compute_dtype: Annotated[
+        Optional[TorchDType],
+        Field(
+            description="Torch dtype for 8-bit compute.",
+        ),
+    ] = None
+
+    attn_implementation: Annotated[
+        Optional[str], Field(description="Attention implementation")
+    ] = None
+
+    use_flash_attention_2: Annotated[
+        Optional[bool],
+        Field(
+            description="Whether to use flash attention 2. (Deprecated: Use attn_implementation instead.)"
+        ),
+    ] = None
+
+    @property
+    def has_quantization(self) -> bool:
+        return self.load_in_4bit or self.load_in_8bit or False
+
+    @property
+    def kwargs_excludes(self) -> set[str]:
+        return set()
+
+    def dump_kwargs(self) -> dict:
+        kwargs = self.model_dump(exclude_none=True, exclude=self.kwargs_excludes)
+
+        if self.has_quantization:
+            quantization_kwargs = {}
+
+            for key in [
+                "load_in_4bit",
+                "load_in_8bit",
+                "bnb_4bit_compute_dtype",
+                "bnb_8bit_compute_dtype",
+            ]:
+                if key in kwargs:
+                    quantization_kwargs[key] = kwargs.pop(key)
+
+            kwargs["quantization_config"] = BitsAndBytesConfig(**quantization_kwargs)
+
+        return kwargs
 
 
 class WhisperModelConfig(ModelLoadConfig, BaseModel):
@@ -63,14 +108,9 @@ class WhisperModelConfig(ModelLoadConfig, BaseModel):
         ),
     ] = None
 
-
-class LanguageIdentificationModelConfig(ModelLoadConfig, BaseModel):
-    model: Annotated[
-        str,
-        Field(
-            description="Model name or path.",
-        ),
-    ] = "facebook/mms-lid-4017"
+    @property
+    def kwargs_excludes(self) -> set[str]:
+        return set(["model"])
 
 
 class TaskEnum(str, Enum):
@@ -81,9 +121,9 @@ class TaskEnum(str, Enum):
 class GenerationConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    task: Annotated[
-        TaskEnum, Field(description="Task to perform.")
-    ] = TaskEnum.transcribe
+    task: Annotated[TaskEnum, Field(description="Task to perform.")] = (
+        TaskEnum.transcribe
+    )
 
     early_stopping: Annotated[
         Optional[Union[bool, Literal["never"]]],

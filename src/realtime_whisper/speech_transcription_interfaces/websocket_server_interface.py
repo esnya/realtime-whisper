@@ -6,9 +6,8 @@ from typing import Union
 import numpy as np
 from websockets.server import WebSocketServerProtocol, serve
 
-from realtime_whisper.realtime_whisper import TranscriptionResult
-
 from ..config.websocket_config import WebsocketConfig
+from ..realtime_whisper import TranscriptionResult
 from . import SpeechTranscriptionInterface
 
 logger = logging.getLogger(__name__)

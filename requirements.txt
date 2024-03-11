@@ -6,5 +6,6 @@ optimum
 pycountry
 pydantic
 pydantic_settings
-transformers
+transformers~=4.38.2
 websockets
+https://github.com/Dao-AILab/flash-attention/releases/download/v2.5.6/flash_attn-2.5.6+cu122torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
