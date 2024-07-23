@@ -141,8 +141,8 @@ class RealtimeWhisper(AsyncContextManager):
         )
         max_volume = np.max(self.audio_buffer)
 
-        if max_volume == 0.0:
-            logger.debug("Zero volume")
+        if max_volume <= self.config.transcription.min_volume:
+            logger.debug("Low volume: %s", max_volume)
             self._clear_buffer()
             return None
 

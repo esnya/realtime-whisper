@@ -56,7 +56,7 @@ class TranscriptionConfig(BaseModel):
     stride: Annotated[
         float,
         Field(
-            gt=0.0,
+            ge=0.0,
             description="Stride duration in seconds for voice termination detection.",
         ),
     ] = 1.0
@@ -64,6 +64,14 @@ class TranscriptionConfig(BaseModel):
     @property
     def stride_frames(self) -> int:
         return int(self.stride * self.sampling_rate)
+
+    min_volume: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            description="Min volume to ignore background noise.",
+        ),
+    ] = 0
 
     language_score_threshold: Annotated[
         float,
