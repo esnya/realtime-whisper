@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
@@ -6,32 +6,32 @@ from typing_extensions import Annotated
 
 class VadConfig(BaseModel):
     min_duration: Annotated[
-        float,
+        Optional[float],
         Field(
             ge=0.0,
-            description="Min audio duration in seconds before processing.",
+            description="Min audio duration in seconds before processing. Falls back to transcription.min_duration when unset.",
         ),
-    ] = 2.0
+    ] = None
 
     mean_logprob_threshold: Annotated[
-        float,
+        Optional[float],
         Field(
             le=0.0,
-            description="Mean log probability threshold for voice activity detection.",
+            description="Mean log probability threshold for voice activity detection. Falls back to transcription.mean_logprob_threshold when unset.",
         ),
-    ] = -0.6
+    ] = None
 
     eos_logprob_threshold: Annotated[
-        float,
+        Optional[float],
         Field(
             le=0.0,
-            description="Log probability threshold for end of transcription detection.",
+            description="Log probability threshold for end of transcription detection. Falls back to transcription.eos_logprob_threshold when unset.",
         ),
-    ] = -0.2
+    ] = None
 
     languages: Annotated[
-        List[str],
+        Optional[List[str]],
         Field(
-            description="Allowed language codes from the LID model. Empty list means all languages are allowed.",
+            description="Allowed language codes from the LID model. Falls back to transcription.languages when unset. Empty list means all languages are allowed.",
         ),
-    ] = []
+    ] = None
