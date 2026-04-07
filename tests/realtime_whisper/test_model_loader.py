@@ -24,7 +24,7 @@ def _make_fake_model(device="cpu", dtype=None):
 class TestLoadWhisperModelsCommonMerge(unittest.TestCase):
     """Verify that common + whisper config merges correctly in load_whisper_models."""
 
-    def _call_with_mocks(self, whisper_cfg: WhisperModelConfig, common: ModelLoadConfig):
+    def _call_with_mocks(self, whisper_cfg: WhisperModelConfig, common: Optional[ModelLoadConfig]):
         """Call load_whisper_models with mocked load_models and return captured config."""
         from transformers import WhisperFeatureExtractor, WhisperForConditionalGeneration, WhisperTokenizerFast
 
@@ -95,7 +95,7 @@ class TestLoadWhisperModelsCommonMerge(unittest.TestCase):
 
         whisper = WhisperModelConfig(model="openai/whisper-tiny", device_map="cpu")
 
-        merged = self._call_with_mocks(whisper, None)  # type: ignore[arg-type]
+        merged = self._call_with_mocks(whisper, None)
 
         self.assertEqual(merged.device_map, "cpu")
 
