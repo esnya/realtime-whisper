@@ -26,7 +26,7 @@ class TranscriptionLogprobs(BaseModel):
     sum: float
     mean: float
     eos: float
-    non_speech: float
+    non_speech: Optional[float] = None
 
 
 class TranscriptionResult(BaseModel):
@@ -157,13 +157,14 @@ class RealtimeWhisper(AsyncContextManager):
         lid_inputs = {k: v.to(self.lid.device) for k, v in lid_inputs.items()}
 
         def _run_lid_inference() -> tuple:
-            lid_logits = self.lid(**lid_inputs).logits
-            lid_logprobs = lid_logits.log_softmax(-1)
-            top_lid = lid_logprobs[0].topk(1)
-            lid_lang_idx = int(top_lid.indices.item())
-            lang = self.lid.config.id2label[lid_lang_idx]
-            score = float(top_lid.values.item())
-            return lang, score
+            with torch.inference_mode():
+                lid_logits = self.lid(**lid_inputs).logits
+                lid_logprobs = lid_logits.log_softmax(-1)
+                top_lid = lid_logprobs[0].topk(1)
+                lid_lang_idx = int(top_lid.indices.item())
+                lang = self.lid.config.id2label[lid_lang_idx]
+                score = float(top_lid.values.item())
+                return lang, score
 
         language_code, language_score = await asyncio.to_thread(_run_lid_inference)
 
@@ -172,12 +173,7 @@ class RealtimeWhisper(AsyncContextManager):
             logger.debug("Low LID score: %.2f", language_score)
             return None
 
-        allowed_languages = (
-            self.config.vad.languages
-            if self.config.vad.languages is not None
-            else self.config.transcription.languages
-        )
-        if allowed_languages and language_code not in allowed_languages:
+        if self.config.vad.languages and language_code not in self.config.vad.languages:
             logger.debug("Unsupported language: %s", language_code)
             return None
 
@@ -257,7 +253,7 @@ class RealtimeWhisper(AsyncContextManager):
                 sum=float(logprobs[1]),
                 mean=float(logprobs[2]),
                 eos=float(logprobs[3]),
-                non_speech=float("nan"),
+                non_speech=None,
             ),
             start_timestamp=start_timestamp,
             end_timestamp=self.end_timestamp,
