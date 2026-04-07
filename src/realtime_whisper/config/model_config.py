@@ -93,6 +93,15 @@ class ModelLoadConfig(BaseModel):
         return kwargs
 
 
+class LidModelConfig(BaseModel):
+    model: Annotated[
+        str,
+        Field(
+            description="Language identification model name or path.",
+        ),
+    ] = "facebook/mms-lid-126"
+
+
 class WhisperModelConfig(ModelLoadConfig, BaseModel):
     model: Annotated[
         str,
