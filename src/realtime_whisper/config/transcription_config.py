@@ -83,7 +83,7 @@ class TranscriptionConfig(BaseModel):
     languages: Annotated[
         List[str],
         Field(
-            description="Deprecated: use vad.languages instead. Allowed language codes for voice termination detection. Empty list means all languages are allowed. When vad.languages is unset, this value is used as a fallback.",  # noqa
+            description="Deprecated: use vad.languages instead. This field is retained for backward-compatible configuration parsing, but voice termination detection should be configured via vad.languages.",  # noqa
         ),
     ] = []
 
