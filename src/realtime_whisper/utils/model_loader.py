@@ -6,13 +6,14 @@ from transformers import (
     BatchFeature,
     GenerationConfig,
     PreTrainedModel,
+    Wav2Vec2ForSequenceClassification,
     WhisperFeatureExtractor,
     WhisperForConditionalGeneration,
     WhisperTokenizerFast,
 )
 from transformers.models.auto.auto_factory import _BaseAutoModelClass
 
-from ..config.model_config import ModelLoadConfig, WhisperModelConfig
+from ..config.model_config import LidModelConfig, ModelLoadConfig, WhisperModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +53,34 @@ def load_models(
     return model, feature_extractor
 
 
+def load_lid_models(
+    config: LidModelConfig,
+    common: Optional[ModelLoadConfig] = None,
+) -> Tuple[Wav2Vec2ForSequenceClassification, Callable[..., BatchFeature]]:
+    model, feature_extractor = load_models(
+        config.model,
+        common or ModelLoadConfig(),
+        Wav2Vec2ForSequenceClassification,
+    )
+    assert isinstance(model, Wav2Vec2ForSequenceClassification)
+    return model, feature_extractor
+
+
 def load_whisper_models(
     config: WhisperModelConfig,
+    common: Optional[ModelLoadConfig] = None,
 ) -> Tuple[
     WhisperForConditionalGeneration, WhisperFeatureExtractor, WhisperTokenizerFast
 ]:
+    if common is not None:
+        base = common.model_dump(exclude_none=True)
+        override = config.model_dump(exclude_none=True)
+        merged = WhisperModelConfig.model_validate({**base, **override})
+    else:
+        merged = config
     model, feature_extractor = load_models(
         config.model,
-        config,
+        merged,
         WhisperForConditionalGeneration,
     )
     assert isinstance(feature_extractor, WhisperFeatureExtractor)

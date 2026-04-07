@@ -10,7 +10,7 @@ from .speech_transcription_interfaces import (
     AggregatedInterface,
     SpeechTranscriptionInterface,
 )
-from .utils.model_loader import load_whisper_models
+from .utils.model_loader import load_lid_models, load_whisper_models
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,8 @@ async def cli():
     )
     realtime_whisper = RealtimeWhisper(
         config,
-        *load_whisper_models(config.whisper),
+        *load_lid_models(config.lid, config.common),
+        *load_whisper_models(config.whisper, config.common),
     )
 
     async with realtime_whisper, interface:

@@ -3,7 +3,6 @@ from enum import Enum
 from typing import List
 
 from pydantic import BaseModel, Field
-from transformers.models.whisper.tokenization_whisper import LANGUAGES
 from typing_extensions import Annotated
 
 
@@ -84,9 +83,9 @@ class TranscriptionConfig(BaseModel):
     languages: Annotated[
         List[str],
         Field(
-            description="Languages for voice termination detection. If transcript is not in these languages, it will be ignored.",  # noqa
+            description="Deprecated: use vad.languages instead. This field is retained for backward-compatible configuration parsing, but voice termination detection should be configured via vad.languages.",  # noqa
         ),
-    ] = list(LANGUAGES.keys())
+    ] = []
 
     min_logprob_threshold: Annotated[
         float,
