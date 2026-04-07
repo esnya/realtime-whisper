@@ -180,7 +180,11 @@ class RealtimeWhisper(AsyncContextManager):
             logger.debug("Low LID score: %.2f", language_score)
             return None
 
-        if self.config.vad.languages and language_code not in self.config.vad.languages:
+        allowed_languages = self.config.vad.languages
+        if not allowed_languages:
+            allowed_languages = self.config.transcription.languages
+
+        if allowed_languages and language_code not in allowed_languages:
             logger.debug("Unsupported language: %s", language_code)
             return None
 
