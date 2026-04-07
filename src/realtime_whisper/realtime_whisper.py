@@ -154,7 +154,14 @@ class RealtimeWhisper(AsyncContextManager):
             return_tensors="pt",
             padding=True,
         )
-        lid_inputs = {k: v.to(self.lid.device) for k, v in lid_inputs.items()}
+        lid_inputs = {
+            k: (
+                v.to(device=self.lid.device, dtype=self.lid.dtype)
+                if torch.is_floating_point(v)
+                else v.to(device=self.lid.device)
+            )
+            for k, v in lid_inputs.items()
+        }
 
         def _run_lid_inference() -> tuple:
             with torch.inference_mode():

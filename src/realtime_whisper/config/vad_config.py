@@ -32,6 +32,6 @@ class VadConfig(BaseModel):
     languages: Annotated[
         Optional[List[str]],
         Field(
-            description="Allowed language codes from the LID model. Falls back to transcription.languages when unset. Empty list means all languages are allowed.",
+            description="Allowed language codes from the LID model. When unset (None), no VAD-specific language filter is applied and all languages are allowed. Set to a non-empty list to restrict to specific LID language codes (e.g. ISO 639-3 codes for MMS models).",
         ),
     ] = None
