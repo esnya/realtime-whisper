@@ -121,7 +121,6 @@ class RealtimeWhisper(AsyncContextManager):
         self.start_timestamp = time()
         self.audio_buffer = self.audio_buffer[-self.stride_frames :]
 
-    @torch.inference_mode()
     async def transcribe(self) -> Optional[TranscriptionResult]:
         await self.is_dirty.wait()
         self.is_dirty.clear()
@@ -180,11 +179,7 @@ class RealtimeWhisper(AsyncContextManager):
             logger.debug("Low LID score: %.2f", language_score)
             return None
 
-        allowed_languages = self.config.vad.languages
-        if not allowed_languages:
-            allowed_languages = self.config.transcription.languages
-
-        if allowed_languages and language_code not in allowed_languages:
+        if self.config.vad.languages and language_code not in self.config.vad.languages:
             logger.debug("Unsupported language: %s", language_code)
             return None
 
@@ -195,14 +190,17 @@ class RealtimeWhisper(AsyncContextManager):
             return_tensors="pt",
         )["input_features"].to(self.whisper.device, self.whisper.dtype)
 
-        model_outputs = await asyncio.to_thread(
-            self.whisper.generate,
-            input_features,
-            **self.config.generation.model_dump(exclude_none=True),
-            max_new_tokens=max_new_tokens,
-            return_dict_in_generate=True,
-            output_scores=True,
-        )
+        def _run_whisper_generate():
+            with torch.inference_mode():
+                return self.whisper.generate(
+                    input_features,
+                    **self.config.generation.model_dump(exclude_none=True),
+                    max_new_tokens=max_new_tokens,
+                    return_dict_in_generate=True,
+                    output_scores=True,
+                )
+
+        model_outputs = await asyncio.to_thread(_run_whisper_generate)
         assert isinstance(model_outputs, dict)
 
         scores = model_outputs["scores"]

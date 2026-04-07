@@ -72,9 +72,15 @@ def load_whisper_models(
 ) -> Tuple[
     WhisperForConditionalGeneration, WhisperFeatureExtractor, WhisperTokenizerFast
 ]:
+    if common is not None:
+        base = common.model_dump(exclude_none=True)
+        override = config.model_dump(exclude_none=True)
+        merged = WhisperModelConfig.model_validate({**base, **override})
+    else:
+        merged = config
     model, feature_extractor = load_models(
         config.model,
-        config,
+        merged,
         WhisperForConditionalGeneration,
     )
     assert isinstance(feature_extractor, WhisperFeatureExtractor)
