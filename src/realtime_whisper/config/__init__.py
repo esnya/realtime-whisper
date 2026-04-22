@@ -10,8 +10,9 @@ from .argument_parser import ArgumentParserBaseSettingsSource
 from .backend_config import BackendConfig
 from .gradio_config import GradioConfig
 from .logging_config import LoggingConfig
-from .model_config import GenerationConfig, WhisperModelConfig
+from .model_config import GenerationConfig, LidModelConfig, ModelLoadConfig, WhisperModelConfig
 from .transcription_config import TranscriptionConfig
+from .vad_config import VadConfig
 from .websocket_config import WebsocketConfig
 
 
@@ -25,7 +26,10 @@ class RealtimeWhisperConfig(BaseSettings):
     )
 
     logging: LoggingConfig = LoggingConfig()
+    common: ModelLoadConfig = ModelLoadConfig()
+    lid: LidModelConfig = LidModelConfig()
     whisper: WhisperModelConfig = WhisperModelConfig()
+    vad: VadConfig = VadConfig()
     generation: GenerationConfig = GenerationConfig()
     transcription: TranscriptionConfig = TranscriptionConfig()
     backend: BackendConfig = BackendConfig()
