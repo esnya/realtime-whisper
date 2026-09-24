@@ -1,5 +1,6 @@
 """Tests for model_loader merge/precedence semantics."""
 import unittest
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 from src.realtime_whisper.config.model_config import (
