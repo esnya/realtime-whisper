@@ -5,7 +5,9 @@ from pydantic import BeforeValidator
 from typing_extensions import Annotated
 
 
-def parse_torch_dtype(value: str) -> torch.dtype:
+def parse_torch_dtype(value: Union[str, torch.dtype]) -> torch.dtype:
+    if isinstance(value, torch.dtype):
+        return value
     dtype = getattr(torch, value)
     if not isinstance(dtype, torch.dtype):
         raise ValueError(f"{value} is not a valid torch.dtype.")
@@ -15,7 +17,9 @@ def parse_torch_dtype(value: str) -> torch.dtype:
 TorchDType = Annotated[torch.dtype, BeforeValidator(parse_torch_dtype)]
 
 
-def parse_torch_dtype_or_auto(value: str) -> Union[torch.dtype, Literal["auto"]]:
+def parse_torch_dtype_or_auto(
+    value: Union[str, torch.dtype],
+) -> Union[torch.dtype, Literal["auto"]]:
     if value == "auto":
         return "auto"
     return parse_torch_dtype(value)
