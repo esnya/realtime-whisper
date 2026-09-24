@@ -72,7 +72,7 @@ class TestLoadWhisperModelsCommonMerge(unittest.TestCase):
         """A torch_dtype set in common should be used when whisper config has no torch_dtype."""
         import torch
 
-        common = ModelLoadConfig(torch_dtype=torch.float16)
+        common = ModelLoadConfig(torch_dtype="float16")
         whisper = WhisperModelConfig(model="openai/whisper-tiny")
 
         merged = self._call_with_mocks(whisper, common)
@@ -83,8 +83,8 @@ class TestLoadWhisperModelsCommonMerge(unittest.TestCase):
         """A torch_dtype in whisper config must override the one from common."""
         import torch
 
-        common = ModelLoadConfig(torch_dtype=torch.float16)
-        whisper = WhisperModelConfig(model="openai/whisper-tiny", torch_dtype=torch.bfloat16)
+        common = ModelLoadConfig(torch_dtype="float16")
+        whisper = WhisperModelConfig(model="openai/whisper-tiny", torch_dtype="bfloat16")
 
         merged = self._call_with_mocks(whisper, common)
 
