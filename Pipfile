@@ -20,11 +20,11 @@ torchaudio = {version = "==2.2.1+cu121", index = "downloadpytorch"}
 transformers = "~=4.38.2"
 websockets = "*"
 aiohttp = "~=3.13.4"
-certifi = ">=2024.7.4"
 pycountry = "*"
 librosa = "*"
 bitsandbytes = "*"
 flash-attn = {version = "*", sys_platform = "!= 'win32'"}
+certifi = ">=2026.10.19"
 
 [dev-packages]
 bandit = "*"
