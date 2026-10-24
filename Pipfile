@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [[source]]
-url = "https://download.pytorch.org/whl/cu121"
+url = "https://download.pytorch.org/whl/cu118"
 verify_ssl = true
 name = "downloadpytorch"
 
@@ -15,16 +15,19 @@ optimum = "*"
 pydantic = "*"
 pydantic-settings = "*"
 safetensors = "*"
-torch = {version = "==2.2.1+cu121", index = "downloadpytorch"}
-torchaudio = {version = "==2.2.1+cu121", index = "downloadpytorch"}
-transformers = "~=4.38.2"
+torch = {version = "==2.7.1+cu118", index = "downloadpytorch"}
+torchaudio = {version = "==2.7.1+cu118", index = "downloadpytorch"}
+transformers = "==4.48.3"
 websockets = "*"
-aiohttp = "~=3.13.4"
+aiohttp = ">=3.14.4"
 pycountry = "*"
 librosa = "*"
 bitsandbytes = "*"
-flash-attn = {version = "*", sys_platform = "!= 'win32'"}
 certifi = ">=2026.10.19"
+filelock = ">=4.2.1"
+fsspec = ">=2026.6.0"
+msgpack = ">=1.2.1"
+urllib3 = ">=2.8.0"
 
 [dev-packages]
 bandit = "*"
@@ -35,4 +38,4 @@ numpy = "*"
 pyaudio = "*"
 
 [requires]
-python_version = "3.10"
+python_version = "3.11"

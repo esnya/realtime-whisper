@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.7.1-cuda11.8-cudnn9-runtime@sha256:8d409f72f99e5968b5c4c9396a21f4b723982cfdf2c1a5b9cc045c5d0a7345a1
 
 ADD requirements.txt /workspace/requirements.txt
 RUN --mount=type=cache,target=/workspace/.cache/pip pip install -r requirements.txt

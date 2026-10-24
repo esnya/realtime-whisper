@@ -6,9 +6,21 @@ While this tool is designed to handle real-time streamed audio, it is specifical
 
 ## Installation
 
+Python 3.11 or newer is required. Pipenv and Docker use the matching PyTorch /
+TorchAudio 2.7.1 CUDA 11.8 pair. CPU use requires the matching CPU wheels from
+the official PyTorch index.
+
 ```bash
 pip install git+https://github.com/esnya/realtime-whisper.git#egg=realtime-whisper
 ```
+
+The old FlashAttention wheel was compiled for Python 3.10 / Torch 2.2 and is no
+longer installed. Use the built-in attention implementation, or explicitly
+configure `attn_implementation="sdpa"`. External FlashAttention and quantized
+GPU inference need separate compatibility validation before use.
+
+See [dependency security notes](docs/dependency-security.md) for the remaining
+Gradio/Pillow constraint and the limits of the offline CPU checks.
 
 ## Usage
 
