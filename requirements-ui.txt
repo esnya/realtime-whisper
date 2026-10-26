@@ -1,0 +1,5 @@
+# Optional UI only. Install from the repository root; the audio-only Pipenv
+# environment and plain package installation do not include these requirements.
+./dependency_patches/gradio
+pillow==13.0.0
+librosa

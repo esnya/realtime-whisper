@@ -1,6 +1,8 @@
 FROM pytorch/pytorch:2.7.1-cuda11.8-cudnn9-runtime@sha256:8d409f72f99e5968b5c4c9396a21f4b723982cfdf2c1a5b9cc045c5d0a7345a1
 
-ADD requirements.txt /workspace/requirements.txt
+WORKDIR /workspace
+COPY requirements.txt requirements-ui.txt /workspace/
+COPY dependency_patches/gradio /workspace/dependency_patches/gradio
 RUN --mount=type=cache,target=/workspace/.cache/pip pip install -r requirements.txt
 ADD ./src/realtime_whisper/ /workspace/realtime_whisper/
 

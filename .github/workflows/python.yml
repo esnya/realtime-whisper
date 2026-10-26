@@ -29,3 +29,22 @@ jobs:
     - name: Test local model loading
       run: |
         python -m unittest tests.realtime_whisper.test_model_loader tests.realtime_whisper.test_model_smoke
+
+  optional-ui:
+    runs-on: ubuntu-latest
+    env:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      GRADIO_ANALYTICS_ENABLED: "False"
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+    - name: Install optional UI
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+        pip install -e . -r requirements-ui.txt
+    - name: Test optional UI with generated fixtures
+      run: python -m unittest tests.realtime_whisper.test_gradio_compat

@@ -1,6 +1,6 @@
 accelerate
 bitsandbytes
-gradio~=6.16.0
+-r requirements-ui.txt
 librosa
 optimum
 pycountry

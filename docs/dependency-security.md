@@ -34,11 +34,36 @@ metadata. No image was pulled or built during the local CPU checks. Deploying
 the new image requires a separate GPU smoke test; the tests do not establish
 live CUDA compatibility.
 
-The optional UI requirements use Gradio 6.16.0, which is compatible with
-Transformers 4.48.3's Hub dependency and fixes the cookie injection and
-FileExplorer traversal advisories. **Pillow remains unresolved:** even current
-Gradio 6.30.0 requires `pillow<13.0`, while the current critical Pillow fixes
-require 13.0.0. No dependency cap is overridden by this update.
+The optional UI requirements use `gradio==6.16.0+esnya.pillow13.1` with Pillow
+13.0.0. This local maintenance build retains Gradio 6.16.0's frontend protocol,
+compatibility with Transformers 4.48.3's Hub dependency, and its cookie
+injection and FileExplorer traversal fixes. Official Gradio 6.16.0 and 6.30.0
+require `pillow<13.0`; the [reviewable recipe](../dependency_patches/gradio/README.md)
+changes one PNG helper to preserve legacy integer clipping explicitly, declares
+`pillow<14.0`, and identifies the distribution with a local version. The UI
+selects Pillow 13.0.0 for the current decoder fixes. There is no resolver
+override, and this maintenance build is not an official release.
+
+The stdlib-only PEP 517 backend checks the exact official wheel URL, size,
+SHA-256, patch contexts and prepared metadata, preserves license notices, and
+rebuilds RECORD. Metadata preparation is offline. Building downloads only the
+fixed public Gradio wheel, or uses `ESNYA_COMPAT_WHEELHOUSE` for an offline
+wheelhouse, without executing the original wheel's Python/build code.
+`requirements-ui.txt` remains optional; Pipfile, Pipfile.lock and the plain
+package's audio dependencies are unchanged. Docker copies the recipe before
+installing its existing UI-enabled requirements.
+
+The real UI constructor exposed an existing Gradio 6 API incompatibility:
+`Audio(source="microphone")` raised `TypeError`. It now uses
+`sources=["microphone"]`, and the existing CSS is passed to `launch`, where
+Gradio 6 applies it. Streaming, queues, transcription callbacks and configured
+launch options are retained.
+
+The optional UI tests construct the real component tree with no server launch,
+exercise generated WAV and transcription-queue callbacks, and round-trip PNG,
+integer PNG, JPEG, TIFF and multi-frame GIF fixtures. They load no pretrained
+models. These checks do not establish live microphone or GPU behavior, or the
+applicability or absence of every Gradio/Transformers advisory.
 
 CI constructs tiny random Whisper and language-ID models, writes local
 safetensors and tokenizer fixtures, invokes the real application loaders,

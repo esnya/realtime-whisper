@@ -12,6 +12,8 @@ from . import SpeechTranscriptionInterface
 
 logger = logging.getLogger(__name__)
 
+GRADIO_CSS = ".wrap.default.full.svelte-zlszon { background: transparent; }"
+
 
 class GradioInterface(SpeechTranscriptionInterface):
     def __init__(self, config: GradioConfig, sampling_rate: int):
@@ -29,7 +31,7 @@ class GradioInterface(SpeechTranscriptionInterface):
                 gr.Textbox(visible=False),
                 gr.Audio(
                     label="Audio Source",
-                    source="microphone",
+                    sources=["microphone"],
                     type="numpy",
                     streaming=True,
                 ),
@@ -42,7 +44,6 @@ class GradioInterface(SpeechTranscriptionInterface):
                 ),
                 "state",
             ],
-            css=".wrap.default.full.svelte-zlszon { background: transparent; }",
             live=True,
         )
 
@@ -117,7 +118,10 @@ class GradioInterface(SpeechTranscriptionInterface):
     async def launch(self):
         self.server, *_ = await asyncio.to_thread(
             self.blocks.queue().launch,
-            **self.config.model_dump(exclude_none=True, exclude=set(("launch",))),
+            **{
+                "css": GRADIO_CSS,
+                **self.config.model_dump(exclude_none=True, exclude=set(("launch",))),
+            },
         )
 
 
@@ -132,7 +136,10 @@ if __name__ == "__main__":
             config.gradio, config.transcription.sampling_rate
         ) as app:
             app.blocks.queue().launch(
-                **config.gradio.model_dump(exclude_none=True, exclude=set(("launch",)))
+                **{
+                    "css": GRADIO_CSS,
+                    **config.gradio.model_dump(exclude_none=True, exclude=set(("launch",))),
+                }
             )
 
     asyncio.run(main())
