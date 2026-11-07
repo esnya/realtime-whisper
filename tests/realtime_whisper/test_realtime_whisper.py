@@ -61,7 +61,8 @@ class TestRealtimeWhisper(IsolatedAsyncioTestCase):
         text = result.transcription
 
         assert isinstance(text, str)
-        self.assertEqual(
+        # Both spellings occur across Torch/platform versions; retain the full sentence check.
+        self.assertRegex(
             text.strip().lower(),
-            "Real-time whisper, automatic speed recognition by whisper from open AI in real-time audio stream through web socket.".lower(),  # noqa
+            r"^real-time whisper, automatic speed recognition by whisper from open ?ai in real-time audio stream through web ?socket\.$",
         )
