@@ -10,7 +10,7 @@ name = "downloadpytorch"
 
 [packages]
 accelerate = "*"
-numpy = "*"
+numpy = ">=1.26.4,<2"
 optimum = "*"
 pydantic = "*"
 pydantic-settings = "*"
@@ -18,6 +18,8 @@ safetensors = "*"
 torch = {version = "==2.2.1+cu121", index = "downloadpytorch"}
 torchaudio = {version = "==2.2.1+cu121", index = "downloadpytorch"}
 transformers = "~=4.38.2"
+# Transformers 4.38 and datasets 5 share the pre-1.0 Hub API.
+huggingface-hub = ">=0.25,<1.0"
 websockets = "*"
 aiohttp = "~=3.13.4"
 pycountry = "*"
@@ -28,10 +30,10 @@ certifi = ">=2026.10.19"
 
 [dev-packages]
 bandit = "*"
-datasets = "*"
+datasets = "~=5.0.1"
 librosa = "*"
 numba = "*"
-numpy = "*"
+numpy = ">=1.26.4,<2"
 pyaudio = "*"
 
 [requires]
