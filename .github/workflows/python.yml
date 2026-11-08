@@ -26,6 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cpu
         pip install -e .
+        pip check
     - name: Test local model loading
       run: |
         python -m unittest tests.realtime_whisper.test_model_loader tests.realtime_whisper.test_model_smoke
@@ -46,5 +47,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cpu
         pip install -e . -r requirements-ui.txt
+        pip check
     - name: Test optional UI with generated fixtures
       run: python -m unittest tests.realtime_whisper.test_gradio_compat
